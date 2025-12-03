@@ -1,7 +1,9 @@
-import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+// rumipa3/lib/src/screens/auth/register_screen.dart
+
+import 'package:flutter/material.dart'; // import 'dart:io'; dihapus
 import 'package:supabase_flutter/supabase_flutter.dart';
+// import 'package:image_picker/image_picker.dart'; dihapus
+// import '../../services/storage_service.dart'; dihapus
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -17,33 +19,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _nimCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
+  // final _phoneCtrl = TextEditingController(); Dihapus
 
-  File? _ktmFile;
+  // File? _ktmFile; Dihapus
   bool _loading = false;
 
   final supabase = Supabase.instance.client;
+  // final _storageService = StorageService(); Dihapus
 
-  /// Pick KTM image from gallery
-  Future<void> _pickKtm() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-    if (picked == null) return;
-    setState(() => _ktmFile = File(picked.path));
-  }
+  /// Pick KTM image from gallery Dihapus
+  // Future<void> _pickKtm() async { ... }
 
   /// Handle register
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_ktmFile == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Silakan upload foto KTM')));
-      return;
-    }
+    // if (_ktmFile == null) { ... } Dihapus
 
     setState(() => _loading = true);
 
@@ -64,45 +54,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final uid = user.id;
 
       // -------------------
-      // 2. Upload KTM Image
+      // 2. Upload KTM Image Dihapus
       // -------------------
-      final filePath = 'ktm/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      await supabase.storage
-          .from('ktm')
-          .upload(
-            filePath,
-            _ktmFile!,
-            fileOptions: const FileOptions(upsert: true),
-          );
+      // final filePath = await _storageService.uploadKtm( ... ); Dihapus
 
       // -------------------
       // 3. Insert Profile to users Table
       // -------------------
-      final insertRes = await supabase.from('users').insert({
-        'id': uid,
-        'name': _nameCtrl.text.trim(),
-        'email': _emailCtrl.text.trim(),
-        'nim': _nimCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim(),
-        'ktm_path': filePath,
-        'role': 'user',
-        'status': 'pending', // user menunggu verifikasi admin
-      });
+      final insertRes = await supabase
+          .from('users')
+          .insert({
+            'id': uid,
+            'name': _nameCtrl.text.trim(),
+            'email': _emailCtrl.text.trim(),
+            'nim': _nimCtrl.text.trim(),
+            'role': 'user',
+            'status': 'pending', // user menunggu verifikasi
+          })
+          .select()
+          .single();
 
-      if (insertRes.error != null) {
-        throw Exception(insertRes.error!.message);
-      }
+      // HAPUS bagian ini:
+      // if (insertRes.error != null) {
+      //   throw Exception(insertRes.error!.message);
+      // }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registrasi berhasil. Menunggu verifikasi admin.'),
-        ),
+        const SnackBar(content: Text('Registrasi berhasil. Silakan login.')),
       );
 
       Navigator.pop(context);
+    } on AuthException catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -118,7 +105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _nimCtrl.dispose();
-    _phoneCtrl.dispose();
+    // _phoneCtrl.dispose(); Dihapus
     super.dispose();
   }
 
@@ -167,32 +154,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   validator: (v) =>
                       v == null || v.isEmpty ? 'NIM wajib diisi' : null,
                 ),
-                const SizedBox(height: 8),
-
-                TextFormField(
-                  controller: _phoneCtrl,
-                  decoration: const InputDecoration(labelText: 'No. Telepon'),
-                  keyboardType: TextInputType.phone,
-                ),
                 const SizedBox(height: 12),
 
-                _ktmFile == null
-                    ? ElevatedButton.icon(
-                        onPressed: _pickKtm,
-                        icon: const Icon(Icons.photo_library),
-                        label: const Text('Pilih Foto KTM'),
-                      )
-                    : Column(
-                        children: [
-                          Image.file(_ktmFile!, height: 200),
-                          TextButton.icon(
-                            onPressed: () => setState(() => _ktmFile = null),
-                            icon: const Icon(Icons.delete),
-                            label: const Text('Hapus & Pilih Ulang'),
-                          ),
-                        ],
-                      ),
-
+                // TextFormField untuk No. Telepon Dihapus
+                // Widget untuk memilih KTM Dihapus
                 const SizedBox(height: 20),
 
                 ElevatedButton(

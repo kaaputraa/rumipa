@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'src/screens/auth/register_screen.dart';
+import 'src/core/session_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,7 +22,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Rumipa3',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
-      home: const RegisterScreen(), // ← TAMPILKAN REGISTER SCREEN
+      home: const SessionHandler(),
     );
   }
 }
