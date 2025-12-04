@@ -3,8 +3,8 @@ class UserModel {
   final String name;
   final String email;
   final String nim;
-  final String phone;
-  final String ktmPath;
+  final String phone; // Dianggap non-nullable, tapi bisa NULL di DB
+  final String ktmPath; // Dianggap non-nullable, tapi bisa NULL di DB
   final String role;
   final String status;
 
@@ -24,7 +24,8 @@ class UserModel {
     name: m['name'],
     email: m['email'],
     nim: m['nim'],
-    phone: m['phone'],
+    // PERBAIKAN: Berikan nilai default '' (String kosong) jika NULL
+    phone: m['phone'] ?? '',
     ktmPath: m['ktm_path'] ?? '',
     role: m['role'] ?? 'user',
     status: m['status'] ?? 'pending',

@@ -4,27 +4,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class StorageService {
   final _client = Supabase.instance.client;
 
-  /// Upload a KTM file into bucket 'ktm' under path 'ktm/<uid>/<random>.jpg'
-  /// Returns the path (not the public url).
+  /// Upload a KTM file into bucket 'ktm' under path '<uid>/<random>.jpg'
+  /// Returns the path (relative to the bucket).
   Future<String> uploadKtm({required String uid, required File file}) async {
-    final String path = 'ktm/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    // PERBAIKAN: Menghapus prefix 'ktm/' karena sudah ada .from('ktm') di bawah.
+    // Path yang dibuat HARUS dimulai dengan UID.
+    final String path = '$uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
     try {
-      final res = await _client.storage
-          .from('ktm')
+      await _client.storage
+          .from('ktm') // Menargetkan bucket 'ktm'
           .upload(
             path,
             file,
-            fileOptions: FileOptions(
+            fileOptions: const FileOptions(
               cacheControl: '3600',
               upsert: true,
-              metadata: {
-                'owner': uid,
-              }, // IMPORTANT: metadata owner for RLS storage policies
+              // Metadata 'owner' tidak diperlukan lagi karena RLS menggunakan auth.uid()
             ),
           );
 
-      // If upload fails, Supabase throws or returns error; this returns path on success.
+      // Mengembalikan path relatif yang akan disimpan di tabel users (misal: 'uid-abc/timestamp.jpg')
       return path;
     } catch (e) {
       rethrow;
