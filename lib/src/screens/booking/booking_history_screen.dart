@@ -97,6 +97,12 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
               final String bookingTime =
                   '(${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)})';
 
+              // Ambil waktu pengajuan LOKAL
+              final DateTime? submittedTimeLocal = booking.createdAt?.toLocal();
+              final String timeSubmitted = submittedTimeLocal != null
+                  ? ' | Diajukan: ${submittedTimeLocal.hour.toString().padLeft(2, '0')}:${submittedTimeLocal.minute.toString().padLeft(2, '0')}'
+                  : '';
+
               return Card(
                 elevation: 2,
                 margin: const EdgeInsets.only(bottom: 10),
@@ -109,8 +115,8 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
                     ),
                   ),
                   title: Text(
-                    // KOREKSI: Gabungkan Tanggal + Jam Booking
-                    '${booking.roomId} - ${booking.date.toIso8601String().substring(0, 10)} $bookingTime',
+                    // Gabungkan Tanggal Booking + Jam Booking + Jam Pengajuan (Lokal)
+                    '${booking.roomId} - ${booking.date.toIso8601String().substring(0, 10)} $bookingTime$timeSubmitted',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text('Keperluan: ${booking.purpose}'),

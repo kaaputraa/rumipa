@@ -189,10 +189,15 @@ class _BookingListWidgetState extends State<BookingListWidget> {
             final String bookingTime =
                 '${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)}';
 
+            // Ambil waktu pengajuan LOKAL
+            final DateTime? submittedTimeLocal = booking.createdAt?.toLocal();
+            final String timeSubmittedDetail = submittedTimeLocal != null
+                ? '${submittedTimeLocal.day}/${submittedTimeLocal.month} ${submittedTimeLocal.hour.toString().padLeft(2, '0')}:${submittedTimeLocal.minute.toString().padLeft(2, '0')}'
+                : '-';
+
             return Card(
               margin: const EdgeInsets.only(bottom: 10),
               child: ExpansionTile(
-                // KOREKSI: Tambahkan Jam Booking ke Title
                 title: Text(
                   '${booking.roomId} - ${booking.userName} (${booking.date.toIso8601String().substring(0, 10)})',
                 ),
@@ -205,16 +210,14 @@ class _BookingListWidgetState extends State<BookingListWidget> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Hapus baris Tanggal/Waktu lama jika sudah ada di subtitle ExpansionTile
-                        // Text('Tanggal: ${booking.date.toIso8601String().substring(0, 10)}'),
-                        // Text('Waktu: ${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)}'),
                         Text(
                           'Tanggal Peminjaman: ${booking.date.toIso8601String().substring(0, 10)}',
                         ),
                         Text('Durasi Peminjaman: $bookingTime'),
-                        Text(
-                          'Diajukan pada: ${booking.createdAt != null ? '${booking.createdAt!.day}/${booking.createdAt!.month} ${booking.createdAt!.hour.toString().padLeft(2, '0')}:${booking.createdAt!.minute.toString().padLeft(2, '0')}' : '-'}',
-                        ),
+
+                        // KOREKSI UTAMA: Menggunakan waktu lokal
+                        Text('Diajukan pada: $timeSubmittedDetail'),
+
                         const Divider(height: 15),
                         Text('NIM: ${booking.nim}'),
                         Text('Telepon: ${booking.phone}'),
@@ -367,6 +370,12 @@ class _HistoryListWidgetState extends State<HistoryListWidget> {
             final String bookingTime =
                 '(${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)})';
 
+            // Ambil waktu pengajuan LOKAL
+            final DateTime? submittedTimeLocal = booking.createdAt?.toLocal();
+            final String timeSubmitted = submittedTimeLocal != null
+                ? ' | Diajukan: ${submittedTimeLocal.hour.toString().padLeft(2, '0')}:${submittedTimeLocal.minute.toString().padLeft(2, '0')}'
+                : '';
+
             return Card(
               elevation: 2,
               margin: const EdgeInsets.only(bottom: 10),
@@ -377,9 +386,9 @@ class _HistoryListWidgetState extends State<HistoryListWidget> {
                       : Icons.check_circle,
                   color: statusColor,
                 ),
-                // KOREKSI: Tambahkan Jam Booking ke Title
                 title: Text(
-                  '${booking.roomId} - ${booking.date.toIso8601String().substring(0, 10)} $bookingTime',
+                  // Gabungkan Tanggal Booking + Jam Booking + Jam Pengajuan (Lokal)
+                  '${booking.roomId} - ${booking.date.toIso8601String().substring(0, 10)} $bookingTime$timeSubmitted',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text('Keperluan: ${booking.purpose}'),
