@@ -1,7 +1,8 @@
 // rumipa3/lib/src/screens/auth/register_screen.dart
 
-import 'package:flutter/material.dart'; // import 'dart:io'; dihapus
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 // import 'package:image_picker/image_picker.dart'; dihapus
 // import '../../services/storage_service.dart'; dihapus
 
@@ -25,10 +26,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _loading = false;
 
   final supabase = Supabase.instance.client;
-  // final _storageService = StorageService(); Dihapus
-
-  /// Pick KTM image from gallery Dihapus
-  // Future<void> _pickKtm() async { ... }
 
   /// Handle register
   Future<void> _submit() async {
@@ -54,12 +51,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final uid = user.id;
 
       // -------------------
-      // 2. Upload KTM Image Dihapus
-      // -------------------
-      // final filePath = await _storageService.uploadKtm( ... ); Dihapus
-
-      // -------------------
-      // 3. Insert Profile to users Table
+      // 2. Insert Profile to users Table
       // -------------------
       final insertRes = await supabase
           .from('users')
@@ -74,26 +66,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
           .select()
           .single();
 
-      // HAPUS bagian ini:
-      // if (insertRes.error != null) {
-      //   throw Exception(insertRes.error!.message);
-      // }
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registrasi berhasil. Silakan login.')),
+        SnackBar(
+          content: const Text('Registrasi berhasil. Silakan login.'),
+          backgroundColor: Colors.green.shade600,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
 
-      Navigator.pop(context);
+      Navigator.pop(context); // Kembali ke Login
     } on AuthException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.message}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     } finally {
       setState(() => _loading = false);
     }
@@ -111,62 +105,169 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Mengambil warna dari Theme global
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Register')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Nama Lengkap'),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Nama wajib diisi' : null,
-                ),
-                const SizedBox(height: 8),
+      backgroundColor: colorScheme.background,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 1. BACK BUTTON (Custom)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(context),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                          color: colorScheme.surface,
+                        ),
+                        child: const Icon(Icons.arrow_back_rounded, size: 20),
+                      ),
+                    ),
+                  ),
 
-                TextFormField(
-                  controller: _emailCtrl,
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) => v == null || !v.contains('@')
-                      ? 'Email tidak valid'
-                      : null,
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 32),
 
-                TextFormField(
-                  controller: _passwordCtrl,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  obscureText: true,
-                  validator: (v) =>
-                      v == null || v.length < 6 ? 'Minimal 6 karakter' : null,
-                ),
-                const SizedBox(height: 8),
+                  // 2. HEADER
+                  Text(
+                    "Buat Akun",
+                    style: GoogleFonts.inter(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1A1C1E),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Daftar untuk mempermudah peminjaman ruangan",
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
 
-                TextFormField(
-                  controller: _nimCtrl,
-                  decoration: const InputDecoration(labelText: 'NIM'),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'NIM wajib diisi' : null,
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 32),
 
-                // TextFormField untuk No. Telepon Dihapus
-                // Widget untuk memilih KTM Dihapus
-                const SizedBox(height: 20),
+                  // 3. FORM FIELDS
+                  // Nama Lengkap
+                  TextFormField(
+                    controller: _nameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Full Name',
+                      prefixIcon: Icon(Icons.person_outline_rounded),
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'Nama wajib diisi' : null,
+                  ),
+                  const SizedBox(height: 16),
 
-                ElevatedButton(
-                  onPressed: _loading ? null : _submit,
-                  child: _loading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Daftar'),
-                ),
-              ],
+                  // NIM
+                  TextFormField(
+                    controller: _nimCtrl,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'NIM',
+                      prefixIcon: Icon(Icons.badge_outlined),
+                    ),
+                    validator: (v) =>
+                        v == null || v.isEmpty ? 'NIM wajib diisi' : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Email
+                  TextFormField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Email Address',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                    validator: (v) => v == null || !v.contains('@')
+                        ? 'Email tidak valid'
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Password
+                  TextFormField(
+                    controller: _passwordCtrl,
+                    obscureText: true,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: Icon(Icons.lock_outline_rounded),
+                    ),
+                    validator: (v) =>
+                        v == null || v.length < 6 ? 'Minimal 6 karakter' : null,
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // 4. ACTION BUTTON
+                  SizedBox(
+                    height: 56,
+                    child: FilledButton(
+                      onPressed: _loading ? null : _submit,
+                      child: _loading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : const Text(
+                              'Daftar',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // 5. FOOTER
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Sudah punya akun?",
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Text(
+                          "Login",
+                          style: TextStyle(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24), // Bottom padding
+                ],
+              ),
             ),
           ),
         ),
