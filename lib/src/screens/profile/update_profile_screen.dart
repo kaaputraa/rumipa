@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // [PENTING] Tambahan import untuk filter input
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/user_model.dart';
 import '../../services/user_service.dart';
@@ -38,27 +40,26 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
     super.dispose();
   }
 
-  /// Memuat data profil saat ini
   Future<void> _fetchProfile() async {
     try {
       final user = await _userService.fetchCurrentUserProfile();
-      setState(() {
-        _user = user;
-        // PERBAIKAN: Gunakan operator null-coalescing dengan aman.
-        _phoneCtrl.text = user.phone;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _user = user;
+          _phoneCtrl.text = user.phone;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Gagal memuat profil: $e')));
       }
-      setState(() => _isLoading = false);
     }
   }
 
-  /// Memilih gambar KTM dari galeri
   Future<void> _pickKtm() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -69,17 +70,13 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
     setState(() => _newKtmFile = File(picked.path));
   }
 
-  /// Menyimpan perubahan profil (upload KTM dan update DB)
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate() || _user == null) return;
 
-    // Syarat: Jika KTM belum ada di DB dan pengguna belum memilih file baru
     if (_user!.ktmPath.isEmpty && _newKtmFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Silakan upload Foto KTM dan isi No. Telepon'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Silakan upload Foto KTM')));
       return;
     }
 
@@ -88,7 +85,6 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
     final uid = Supabase.instance.client.auth.currentUser!.id;
 
     try {
-      // 1. Upload file KTM baru jika ada
       if (_newKtmFile != null) {
         finalKtmPath = await _storageService.uploadKtm(
           uid: uid,
@@ -96,7 +92,6 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
         );
       }
 
-      // 2. Update data di tabel users
       await _userService.updateProfile(
         uid: uid,
         phone: _phoneCtrl.text.trim(),
@@ -106,9 +101,11 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil berhasil diperbarui!')),
+        const SnackBar(
+          content: Text('Profil berhasil diperbarui!'),
+          backgroundColor: Colors.green,
+        ),
       );
-      // Kembali ke dashboard setelah sukses
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -117,140 +114,328 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
         ).showSnackBar(SnackBar(content: Text('Gagal menyimpan profil: $e')));
       }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading || _user == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Perbarui Profil')),
-        body: const Center(child: CircularProgressIndicator()),
+    const colorBg = Color(0xFFFAFAFB);
+    const colorPrimaryBlue = Color(0xFF135BDA);
+    const colorHeader = Color(0xFF03122B);
+    const colorTextGray = Color(0xFF4E5153);
+    const colorBorder = Color(0xFFCED4DA);
+
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: colorBg,
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    // Tentukan apakah KTM sudah ada atau belum
-    final bool ktmExist = _user!.ktmPath.isNotEmpty && _newKtmFile == null;
+    if (_user == null) {
+      return const Scaffold(
+        backgroundColor: colorBg,
+        body: Center(child: Text("Gagal memuat data user")),
+      );
+    }
+
+    final bool ktmExist = _user!.ktmPath.isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Perbarui Profil')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
+      backgroundColor: colorBg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Form(
+            key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Info Status Verifikasi
-                Card(
-                  color: _user!.status == 'pending'
-                      ? Colors.orange.shade50
-                      : Colors.green.shade50,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'Status Verifikasi: ${_user!.status.toUpperCase()}',
-                      style: TextStyle(
-                        color: _user!.status == 'pending'
-                            ? Colors.orange.shade800
-                            : Colors.green.shade800,
-                        fontWeight: FontWeight.bold,
+                // 1. HEADER
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new,
+                        size: 20,
+                        color: colorHeader,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Profile',
+                      style: GoogleFonts.inter(
+                        color: colorHeader,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
 
-                // No. Telepon
-                TextFormField(
+                // [DIHAPUS] Bagian Status Badge sudah dihilangkan dari sini
+                const SizedBox(height: 32),
+
+                // 2. FORM FIELDS
+                _buildReadOnlyField(
+                  label: "Nama Lengkap",
+                  value: _user!.name,
+                  colorBorder: colorBorder,
+                  colorText: colorTextGray,
+                ),
+                const SizedBox(height: 22),
+
+                _buildReadOnlyField(
+                  label: "NIM",
+                  value: _user!.nim,
+                  colorBorder: colorBorder,
+                  colorText: colorTextGray,
+                ),
+                const SizedBox(height: 22),
+
+                _buildReadOnlyField(
+                  label: "Email",
+                  value: _user!.email,
+                  colorBorder: colorBorder,
+                  colorText: colorTextGray,
+                ),
+                const SizedBox(height: 22),
+
+                // Field: No HP (Perbaikan Validasi di sini)
+                _buildEditableField(
                   controller: _phoneCtrl,
-                  decoration: const InputDecoration(labelText: 'No. Telepon'),
-                  keyboardType: TextInputType.phone,
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'No. Telepon wajib diisi' : null,
+                  hint: "Nomor Telphone",
+                  colorBorder: colorBorder,
+                  colorText: colorTextGray,
+                  isNumber: true, // Flag ini mengaktifkan filter angka
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 22),
 
-                // KTM
-                Text(
-                  'Foto KTM (Kartu Tanda Mahasiswa)',
-                  style: Theme.of(context).textTheme.titleMedium,
+                // Field: Bukti Identitas
+                _buildKtmPicker(
+                  ktmExist: ktmExist,
+                  colorBorder: colorBorder,
+                  colorText: colorTextGray,
+                  colorPrimary: colorPrimaryBlue,
                 ),
-                const SizedBox(height: 10),
 
-                if (ktmExist)
-                  // Tampilan jika KTM sudah ada di database
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text('Foto KTM saat ini sudah tersimpan.'),
-                      FutureBuilder<String>(
-                        future: _storageService.getSignedUrl(_user!.ktmPath),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 20),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            );
-                          }
-                          if (snapshot.hasError || !snapshot.hasData) {
-                            return const Text('Gagal memuat pratinjau KTM.');
-                          }
-                          return Image.network(
-                            snapshot.data!,
-                            height: 200,
-                            fit: BoxFit.contain,
-                          );
-                        },
+                const SizedBox(height: 44),
+
+                // 3. TOMBOL SIMPAN
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _saveProfile,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colorPrimaryBlue,
+                      foregroundColor: const Color(0xFFECF3FA),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      TextButton.icon(
-                        onPressed: _pickKtm,
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Ganti Foto KTM'),
-                      ),
-                    ],
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            'Simpan',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
                   ),
-
-                // Tampilan jika pengguna memilih file baru
-                if (_newKtmFile != null)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Image.file(_newKtmFile!, height: 200),
-                      TextButton.icon(
-                        onPressed: () => setState(() => _newKtmFile = null),
-                        icon: const Icon(Icons.delete),
-                        label: const Text('Hapus & Pilih Ulang'),
-                      ),
-                    ],
-                  )
-                else if (!ktmExist)
-                  // Tampilan jika belum ada KTM dan belum memilih file
-                  ElevatedButton.icon(
-                    onPressed: _pickKtm,
-                    icon: const Icon(Icons.photo_library),
-                    label: const Text('Pilih Foto KTM'),
-                  ),
-
-                const SizedBox(height: 30),
-
-                // Tombol Simpan
-                ElevatedButton(
-                  onPressed: _isSaving ? null : _saveProfile,
-                  child: _isSaving
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Simpan Profil'),
                 ),
+                const SizedBox(height: 40),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyField({
+    required String label,
+    required String value,
+    required Color colorBorder,
+    required Color colorText,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorBorder, width: 1),
+      ),
+      child: Text(
+        value.isEmpty ? label : value,
+        style: GoogleFonts.inter(
+          color: colorText,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditableField({
+    required TextEditingController controller,
+    required String hint,
+    required Color colorBorder,
+    required Color colorText,
+    bool isNumber = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextFormField(
+        controller: controller,
+        // Keyboard type numeric agar UX keyboard angka muncul
+        keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+        // [PERBAIKAN UTAMA] Memaksa input hanya boleh angka
+        inputFormatters: isNumber
+            ? [FilteringTextInputFormatter.digitsOnly]
+            : [],
+        style: GoogleFonts.inter(
+          color: colorText,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          hintText: hint,
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 17,
+            vertical: 18,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorBorder, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF135BDA), width: 1.5),
+          ),
+        ),
+        validator: (v) {
+          if (v == null || v.isEmpty) return 'Data ini wajib diisi';
+          // Validasi tambahan: Minimal 10 digit jika ini nomor telepon
+          if (isNumber && v.length < 10)
+            return 'Nomor HP tidak valid (min 10 digit)';
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildKtmPicker({
+    required bool ktmExist,
+    required Color colorBorder,
+    required Color colorText,
+    required Color colorPrimary,
+  }) {
+    return GestureDetector(
+      onTap: _pickKtm,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorBorder, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Bukti Identitas (KTM)',
+                  style: GoogleFonts.inter(
+                    color: colorText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Icon(Icons.upload_file, color: colorPrimary, size: 20),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_newKtmFile != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  _newKtmFile!,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Tap untuk ganti foto",
+                style: GoogleFonts.inter(fontSize: 10, color: Colors.grey),
+              ),
+            ] else if (ktmExist) ...[
+              FutureBuilder<String>(
+                future: _storageService.getSignedUrl(_user!.ktmPath),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        snapshot.data!,
+                        height: 150,
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) =>
+                            const Text("Gagal memuat gambar"),
+                      ),
+                    );
+                  }
+                  return const LinearProgressIndicator();
+                },
+              ),
+            ] else ...[
+              Container(
+                height: 100,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.grey.shade300,
+                    style: BorderStyle.solid,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    "Belum ada foto.\nTap untuk upload.",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

@@ -25,7 +25,6 @@ class _UserDashboardState extends State<UserDashboard> {
   }
 
   Future<void> _logout() async {
-    // Tampilkan dialog konfirmasi biar lebih UX friendly
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -99,6 +98,13 @@ class _UserDashboardState extends State<UserDashboard> {
     }
   }
 
+  // Helper untuk mengambil nama belakang saja
+  String _getLastName(String fullName) {
+    if (fullName.isEmpty) return "User";
+    List<String> parts = fullName.trim().split(' ');
+    return parts.last;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -120,30 +126,42 @@ class _UserDashboardState extends State<UserDashboard> {
           final isProfileComplete =
               user.phone.isNotEmpty && user.ktmPath.isNotEmpty;
 
+          // Ambil nama belakang
+          final lastName = _getLastName(user.name);
+
           return SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. HEADER SECTION (Custom AppBar)
+                  // 1. HEADER SECTION
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            child: Text(
-                              "Selamat Datang, ${user.name}",
+                      // Menggunakan Expanded agar teks tidak menabrak tombol logout
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Selamat Datang, $lastName", // Nama Belakang
+                              maxLines: 1, // Batasi 1 baris
+                              overflow: TextOverflow
+                                  .ellipsis, // Titik-titik jika kepanjangan
                               style: GoogleFonts.inter(
                                 fontSize: 20,
+                                fontWeight: FontWeight
+                                    .bold, // Sedikit ditebalkan agar bagus
                                 color: Colors.black,
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(
+                        width: 16,
+                      ), // Jarak aman antara teks dan tombol
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -169,12 +187,11 @@ class _UserDashboardState extends State<UserDashboard> {
 
                   const SizedBox(height: 32),
 
-                  // 2. STATUS CARD (Alert Box Modern)
+                  // 2. STATUS CARD
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      // Jika lengkap: Biru Gradient, Jika belum: Oranye lembut
                       gradient: isProfileComplete
                           ? LinearGradient(
                               colors: [
@@ -269,8 +286,10 @@ class _UserDashboardState extends State<UserDashboard> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 3. MENU GRID (Daftar Menu Modern)
-                  // Menu 1: Peminjaman (Utama)
+                  // 3. MENU LIST (Vertical Stack)
+                  // Semua button sekarang Full Width & seragam
+
+                  // Menu 1: Peminjaman
                   _buildMenuCard(
                     context: context,
                     title: "Pinjam Ruangan",
@@ -278,39 +297,36 @@ class _UserDashboardState extends State<UserDashboard> {
                     icon: Icons.meeting_room_rounded,
                     color: theme.colorScheme.primary,
                     onTap: () => _checkAndNavigateToBooking(user),
-                    isPrimary: true,
+                    isPrimary: true, // Ada arrow icon
                   ),
 
                   const SizedBox(height: 16),
 
-                  // Row untuk menu sekunder
-                  Row(
-                    children: [
-                      // Menu 2: History
-                      Expanded(
-                        child: _buildMenuCard(
-                          context: context,
-                          title: "Riwayat",
-                          subtitle: "Cek status",
-                          icon: Icons.history_rounded,
-                          color: Colors.purple,
-                          onTap: _navigateToBookingHistory,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      // Menu 3: Edit Profile
-                      Expanded(
-                        child: _buildMenuCard(
-                          context: context,
-                          title: "Profil",
-                          subtitle: "Edit data",
-                          icon: Icons.person_outline_rounded,
-                          color: Colors.teal,
-                          onTap: _navigateToUpdateProfile,
-                        ),
-                      ),
-                    ],
+                  // Menu 2: Riwayat (Full Width)
+                  _buildMenuCard(
+                    context: context,
+                    title: "Riwayat Peminjaman",
+                    subtitle: "Cek status pengajuan",
+                    icon: Icons.history_rounded,
+                    color: Colors.purple,
+                    onTap: _navigateToBookingHistory,
+                    isPrimary: true, // Ada arrow icon agar seragam
                   ),
+
+                  const SizedBox(height: 16),
+
+                  // Menu 3: Profil (Full Width)
+                  _buildMenuCard(
+                    context: context,
+                    title: "Profil Saya",
+                    subtitle: "Edit data & informasi akun",
+                    icon: Icons.person_outline_rounded,
+                    color: Colors.teal,
+                    onTap: _navigateToUpdateProfile,
+                    isPrimary: true, // Ada arrow icon agar seragam
+                  ),
+
+                  const SizedBox(height: 32), // Extra padding bottom
                 ],
               ),
             ),
@@ -320,7 +336,7 @@ class _UserDashboardState extends State<UserDashboard> {
     );
   }
 
-  // Helper Widget untuk membuat Kartu Menu
+  // Helper Widget
   Widget _buildMenuCard({
     required BuildContext context,
     required String title,
@@ -347,7 +363,6 @@ class _UserDashboardState extends State<UserDashboard> {
           border: Border.all(color: Colors.grey.shade100),
         ),
         child: Row(
-          // Jika Primary pakai Row, jika tidak pakai Column biar muat
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
@@ -356,7 +371,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: isPrimary ? 32 : 24),
+              child: Icon(icon, color: color, size: 32), // Ukuran icon seragam
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -382,6 +397,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 ],
               ),
             ),
+            // Selalu tampilkan panah jika isPrimary true (sekarang semua true)
             if (isPrimary)
               Icon(
                 Icons.arrow_forward_ios_rounded,
