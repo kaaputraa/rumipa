@@ -160,6 +160,45 @@ class _BookingListWidgetState extends State<BookingListWidget> {
     }
   }
 
+  /// Fungsi baru untuk menampilkan popup gambar Full Screen + Zoom
+  void _showImagePreview(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Fitur Zoom / Pan
+            InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(imageUrl),
+              ),
+            ),
+            // Tombol Close kecil di pojok
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                onPressed: () => Navigator.pop(ctx),
+                icon: const CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 14,
+                  child: Icon(Icons.close, size: 18, color: Colors.black),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<BookingModel>>(
@@ -228,9 +267,7 @@ class _BookingListWidgetState extends State<BookingListWidget> {
         border: Border.all(color: Colors.grey.shade100),
       ),
       child: Theme(
-        data: theme.copyWith(
-          dividerColor: Colors.transparent,
-        ), // Hilangkan garis ExpansionTile
+        data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -285,29 +322,75 @@ class _BookingListWidgetState extends State<BookingListWidget> {
 
             const SizedBox(height: 16),
 
-            // Foto KTM dengan rounded corner
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                color: Colors.grey.shade100,
-                width: double.infinity,
-                height: 180,
-                child: FutureBuilder<String>(
-                  future: _storageService.getSignedUrl(booking.ktmPath),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData)
-                      return const Center(child: CircularProgressIndicator());
-                    return Image.network(
-                      snapshot.data!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Center(child: Text("Gagal muat gambar")),
-                    );
-                  },
-                ),
-              ),
+            // --- BAGIAN FOTO KTM (UPDATED) ---
+            FutureBuilder<String>(
+              future: _storageService.getSignedUrl(booking.ktmPath),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Container(
+                    height: 150,
+                    width: double.infinity,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const CircularProgressIndicator(),
+                  );
+                }
+
+                final imageUrl = snapshot.data!;
+
+                return GestureDetector(
+                  onTap: () => _showImagePreview(context, imageUrl),
+                  child: Container(
+                    width: double.infinity,
+                    height: 200, // Tinggi area tampilan
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100, // Background area kosong
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Gambar Utama (Contain agar tidak terpotong)
+                          Image.network(
+                            imageUrl,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.contain, // Agar pas dalam box
+                            errorBuilder: (_, __, ___) =>
+                                const Center(child: Text("Gagal muat gambar")),
+                          ),
+                          // Overlay hint (opsional)
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.zoom_in,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
 
+            // ---------------------------------
             const SizedBox(height: 20),
 
             // Action Buttons
@@ -379,7 +462,6 @@ class _BookingListWidgetState extends State<BookingListWidget> {
     );
   }
 }
-
 // =========================================================
 // WIDGET KHUSUS RIWAYAT
 // =========================================================
