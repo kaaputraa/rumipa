@@ -1,11 +1,15 @@
+// rumipa3/lib/src/screens/booking/booking_screen.dart
+
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/user_model.dart';
 import '../../models/booking_model.dart';
 import '../../services/booking_service.dart';
 import '../../models/room_model.dart';
 import '../../services/room_service.dart';
+// Asumsi: Anda memiliki file ini untuk notifikasi yang lebih bagus
+import '../../widgets/custom_snackbar.dart';
 
 class BookingScreen extends StatefulWidget {
   final UserModel user;
@@ -21,13 +25,13 @@ class _BookingScreenState extends State<BookingScreen> {
   final _roomService = RoomService();
   bool _isLoading = false;
 
-  // Data Ruangan dan Ketersediaan
+  // Data
   Future<List<RoomModel>>? _roomsFuture;
   List<BookingModel> _approvedBookings = [];
   bool _isFetchingAvailability = false;
-  String? _availabilityFetchError; // BARU: Status error fetching
+  String? _availabilityFetchError;
 
-  // Form Controllers/Values
+  // Form Values
   String? _selectedRoomName;
   final _purposeCtrl = TextEditingController();
   DateTime? _selectedDate;
@@ -46,9 +50,7 @@ class _BookingScreenState extends State<BookingScreen> {
     super.dispose();
   }
 
-  /// Memuat daftar ruangan yang sudah terisi berdasarkan Room dan Date yang dipilih
   Future<void> _fetchAvailabilityList() async {
-    // Hanya fetch jika kedua kriteria sudah dipilih
     if (_selectedRoomName == null || _selectedDate == null) {
       setState(() => _approvedBookings = []);
       return;
@@ -57,7 +59,7 @@ class _BookingScreenState extends State<BookingScreen> {
     setState(() {
       _isFetchingAvailability = true;
       _approvedBookings = [];
-      _availabilityFetchError = null; // Reset error
+      _availabilityFetchError = null;
     });
 
     try {
@@ -65,48 +67,48 @@ class _BookingScreenState extends State<BookingScreen> {
         roomId: _selectedRoomName!,
         date: _selectedDate!,
       );
-
-      if (mounted) {
-        setState(() {
-          _approvedBookings = list;
-        });
-      }
+      if (mounted) setState(() => _approvedBookings = list);
     } catch (e) {
-      print('Error fetching approved bookings: $e');
-      if (mounted) {
-        setState(() {
-          // Tampilkan pesan error jika fetch gagal (kemungkinan RLS)
-          _availabilityFetchError =
-              'Gagal memuat ketersediaan. Cek RLS SELECT di tabel bookings.';
-        });
-      }
+      if (mounted)
+        setState(() => _availabilityFetchError = 'Gagal memuat jadwal.');
     } finally {
-      if (mounted) {
-        setState(() => _isFetchingAvailability = false);
-      }
+      if (mounted) setState(() => _isFetchingAvailability = false);
     }
   }
 
-  /// Memilih tanggal
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: _selectedDate ?? DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 90)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() => _selectedDate = picked);
-      // Panggil fetch list setelah tanggal diubah
       _fetchAvailabilityList();
     }
   }
 
-  /// Memilih waktu
   Future<void> _selectTime(bool isStart) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -119,35 +121,39 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  /// Mengubah TimeOfDay menjadi string format HH:MM:SS
   String _timeOfDayToString(TimeOfDay time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
     return '$hour:$minute:00';
   }
 
-  /// Mengajukan formulir peminjaman
   Future<void> _submit() async {
-    // 1. Validasi form dasar
+    // [PERBAIKAN] Dapatkan Theme di awal function untuk digunakan dalam dialog
+    final theme = Theme.of(context);
+
     if (!_formKey.currentState!.validate() ||
         _selectedRoomName == null ||
         _selectedDate == null ||
         _startTime == null ||
         _endTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Harap lengkapi semua data peminjaman!')),
+      // Menggunakan Custom SnackBar untuk pesan validasi
+      showCustomSnackBar(
+        context,
+        message: 'Harap lengkapi semua data form!',
+        isSuccess: false,
       );
       return;
     }
 
-    // 2. Validasi Waktu Selesai > Waktu Mulai
+    // Validasi Waktu
     if (_startTime!.hour > _endTime!.hour ||
         (_startTime!.hour == _endTime!.hour &&
             _startTime!.minute >= _endTime!.minute)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Waktu selesai harus setelah waktu mulai.'),
-        ),
+      // Menggunakan Custom SnackBar untuk pesan validasi
+      showCustomSnackBar(
+        context,
+        message: 'Jam selesai harus setelah jam mulai.',
+        isSuccess: false,
       );
       return;
     }
@@ -158,9 +164,7 @@ class _BookingScreenState extends State<BookingScreen> {
       final startTimeStr = _timeOfDayToString(_startTime!);
       final endTimeStr = _timeOfDayToString(_endTime!);
 
-      // =======================================================
-      // PENGECEKAN KONFLIK FINAL (Saat Submit)
-      // =======================================================
+      // Cek Konflik Final
       final isAvailable = await _bookingService.checkAvailability(
         roomId: _selectedRoomName!,
         date: _selectedDate!,
@@ -169,24 +173,34 @@ class _BookingScreenState extends State<BookingScreen> {
       );
 
       if (!isAvailable) {
-        // Jika konflik, panggil ulang list agar visualisasi terupdate jika data berubah saat ini.
         _fetchAvailabilityList();
-
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Konflik! Ruangan sudah terpakai pada jam tersebut.',
+          // Dialog Gagal yang ditingkatkan dengan Icon
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              icon: const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 36,
               ),
-              backgroundColor: Colors.red,
+              title: const Text("Gagal Booking"),
+              content: const Text(
+                "Maaf, ruangan sudah terisi pada jam tersebut. Silakan cek jadwal di bawah.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Oke"),
+                ),
+              ],
             ),
           );
         }
         return;
       }
-      // =======================================================
 
-      // 3. Jika tersedia, lanjutkan proses booking
+      // Submit
       final booking = BookingModel(
         userId: widget.user.id,
         roomId: _selectedRoomName!,
@@ -204,198 +218,404 @@ class _BookingScreenState extends State<BookingScreen> {
       await _bookingService.submitBooking(booking);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Peminjaman berhasil diajukan. Menunggu persetujuan Admin.',
-          ),
-        ),
+
+      // Success Dialog dengan Gradient Custom
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => _buildGradientSuccessDialog(ctx, theme),
       );
-      Navigator.pop(context);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengajukan peminjaman: $e')),
-      );
+      if (mounted) {
+        // Menggunakan custom_snackbar untuk error umum
+        showCustomSnackBar(context, message: 'Error: $e', isSuccess: false);
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Formulir Peminjaman Ruangan')),
+      backgroundColor: theme.colorScheme.background,
+      appBar: AppBar(
+        title: Text(
+          "Form Peminjaman",
+          style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+      ),
       body: FutureBuilder<List<RoomModel>>(
-        // Memuat data ruangan secara dinamis
         future: _roomsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError || !snapshot.hasData) {
-            return Center(
-              child: Text('Gagal memuat ruangan: ${snapshot.error}'),
-            );
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text("Tidak ada data ruangan."));
           }
 
           final roomOptions = snapshot.data!;
-          if (roomOptions.isEmpty) {
-            return const Center(
-              child: Text(
-                'Tidak ada ruangan yang tersedia. Harap hubungi Admin.',
-              ),
-            );
-          }
 
-          // KOREKSI: Panggil fetch list saat ruangan pertama kali dimuat
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted &&
-                _selectedRoomName == null &&
-                roomOptions.isNotEmpty) {
+          // Auto select first room if null
+          if (_selectedRoomName == null && roomOptions.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
               setState(() {
                 _selectedRoomName = roomOptions.first.name;
               });
-              _fetchAvailabilityList();
-            }
-          });
+            });
+          }
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Data Pengguna (Read-only)
-                  Text('Nama: ${widget.user.name}'),
-                  Text('NIM: ${widget.user.nim}'),
-                  Text('No. Telp: ${widget.user.phone}'),
-                  const Divider(height: 20),
-
-                  // Pilihan Ruangan (Menggunakan data dinamis)
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Ruangan yang Dipinjam',
+                  // 1. INFORMASI PEMINJAM (Read Only Card)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade100),
                     ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.account_circle_rounded,
+                          color: Colors.blue,
+                          size: 40,
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.user.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              "${widget.user.nim}  •  ${widget.user.phone}",
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+                  Text(
+                    "Detail Peminjaman",
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2. PILIH RUANGAN (Dropdown)
+                  DropdownButtonFormField<String>(
                     value: _selectedRoomName,
-                    items: roomOptions.map((room) {
-                      return DropdownMenuItem(
-                        value: room.name,
-                        child: Text(room.name),
-                      );
-                    }).toList(),
+                    items: roomOptions
+                        .map(
+                          (room) => DropdownMenuItem(
+                            value: room.name,
+                            child: Text(room.name),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (value) {
                       setState(() => _selectedRoomName = value);
-                      _fetchAvailabilityList(); // Panggil saat Ruangan diubah
+                      _fetchAvailabilityList();
                     },
-                    validator: (v) =>
-                        v == null ? 'Wajib memilih ruangan' : null,
+                    decoration: const InputDecoration(
+                      labelText: "Pilih Ruangan",
+                      prefixIcon: Icon(Icons.meeting_room_outlined),
+                    ),
                   ),
+
                   const SizedBox(height: 16),
 
-                  // Keperluan Peminjaman
+                  // 3. KEPERLUAN
                   TextFormField(
                     controller: _purposeCtrl,
+                    maxLines: 2,
+                    textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(
-                      labelText: 'Keperluan Peminjaman',
+                      labelText: "Keperluan Acara",
+                      prefixIcon: Icon(Icons.description_outlined),
+                      alignLabelWithHint: true,
                     ),
-                    maxLines: 3,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Keperluan wajib diisi' : null,
+                    validator: (v) => v!.isEmpty ? "Wajib diisi" : null,
                   ),
+
                   const SizedBox(height: 16),
 
-                  // Tanggal Peminjaman
-                  ListTile(
-                    title: Text(
-                      'Tanggal Peminjaman: ${_selectedDate?.toIso8601String().substring(0, 10) ?? "Pilih Tanggal"}',
-                    ),
-                    trailing: const Icon(Icons.calendar_today),
+                  // 4. TANGGAL
+                  InkWell(
                     onTap: _selectDate,
-                  ),
-                  const Divider(),
-
-                  // Waktu Mulai
-                  ListTile(
-                    title: Text(
-                      'Waktu Mulai: ${_startTime?.format(context) ?? "Pilih Waktu Mulai"}',
-                    ),
-                    trailing: const Icon(Icons.access_time),
-                    onTap: () => _selectTime(true),
-                  ),
-                  // Waktu Selesai
-                  ListTile(
-                    title: Text(
-                      'Waktu Selesai: ${_endTime?.format(context) ?? "Pilih Waktu Selesai"}',
-                    ),
-                    trailing: const Icon(Icons.access_time),
-                    onTap: () => _selectTime(false),
-                  ),
-                  const Divider(height: 10),
-
-                  // ===============================================
-                  // TAMPILAN KETERSEDIAAN (Visual Feedback)
-                  // ===============================================
-                  Text(
-                    'Jadwal Terisi pada ${_selectedDate?.toIso8601String().substring(0, 10) ?? "Tanggal Pilihan"}:',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-
-                  if (_isFetchingAvailability)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                    borderRadius: BorderRadius.circular(16),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: "Tanggal Peminjaman",
+                        prefixIcon: Icon(Icons.calendar_month_outlined),
                       ),
-                    )
-                  else if (_availabilityFetchError !=
-                      null) // Tampilkan error jika fetch gagal
-                    Text(
-                      _availabilityFetchError!,
-                      style: TextStyle(color: Colors.red),
-                    )
-                  else if (_approvedBookings.isEmpty &&
-                      _selectedRoomName != null &&
-                      _selectedDate != null)
-                    const Text(
-                      'Ruangan kosong sepanjang hari yang dipilih. ✅',
-                      style: TextStyle(color: Colors.green),
-                    )
-                  else if (_approvedBookings.isNotEmpty)
-                    // Menampilkan list booking yang terisi
-                    ..._approvedBookings.map((booking) {
-                      final userName = booking.userName.isEmpty
-                          ? 'Pengguna Lain'
-                          : booking.userName;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Text(
-                          // Menampilkan waktu booking yang terisi
-                          '${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)} (Dipinjam oleh: $userName)',
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.w500,
+                      child: Text(
+                        _selectedDate == null
+                            ? "Pilih Tanggal"
+                            : _selectedDate!.toIso8601String().substring(0, 10),
+                        style: TextStyle(
+                          color: _selectedDate == null
+                              ? Colors.grey.shade600
+                              : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 5. JAM MULAI & SELESAI (Row)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _selectTime(true),
+                          borderRadius: BorderRadius.circular(16),
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: "Jam Mulai",
+                              prefixIcon: Icon(Icons.schedule),
+                            ),
+                            child: Text(_startTime?.format(context) ?? "--:--"),
                           ),
                         ),
-                      );
-                    }).toList(),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _selectTime(false),
+                          borderRadius: BorderRadius.circular(16),
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: "Jam Selesai",
+                              prefixIcon: Icon(Icons.schedule),
+                            ),
+                            child: Text(_endTime?.format(context) ?? "--:--"),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
 
-                  const SizedBox(height: 30),
-                  // ===============================================
+                  const SizedBox(height: 32),
 
-                  // Tombol Submit
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text('Ajukan Peminjaman'),
+                  // 6. AVAILABILITY STATUS (Dynamic UI)
+                  if (_selectedRoomName != null && _selectedDate != null)
+                    _buildAvailabilityStatus(),
+
+                  const SizedBox(height: 32),
+
+                  // 7. SUBMIT BUTTON
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: FilledButton(
+                      onPressed: _isLoading ? null : _submit,
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Ajukan Booking",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
                   ),
                 ],
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildAvailabilityStatus() {
+    if (_isFetchingAvailability) {
+      return Center(
+        child: LinearProgressIndicator(
+          color: Colors.grey.shade300,
+          minHeight: 2,
+        ),
+      );
+    }
+
+    if (_availabilityFetchError != null) {
+      return Text(
+        _availabilityFetchError!,
+        style: const TextStyle(color: Colors.red),
+      );
+    }
+
+    if (_approvedBookings.isNotEmpty) {
+      // JIKA ADA JADWAL TERISI
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                SizedBox(width: 8),
+                Text(
+                  "Jadwal Terisi Hari Ini:",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ..._approvedBookings.map(
+              (b) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.circle, size: 8, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      "${b.startTime.substring(0, 5)} - ${b.endTime.substring(0, 5)}",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      " (${b.userName.isEmpty ? 'Booked' : b.userName})",
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // JIKA KOSONG (AVAILABLE)
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.shade200),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: Colors.green),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "Ruangan tersedia sepanjang hari ini.",
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  // Widget helper untuk dialog sukses dengan gradien (Baru)
+  Widget _buildGradientSuccessDialog(BuildContext context, ThemeData theme) {
+    return Dialog(
+      // Membulatkan sudut dialog
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 10,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          // >>> IMPLEMENTASI GRADIENT <<<
+          gradient: LinearGradient(
+            colors: [theme.colorScheme.primary, Colors.lightBlue.shade300],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.primary.withOpacity(0.4),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.check_circle_outline_rounded,
+              color: Colors
+                  .white, // Ikon Putih agar kontras di latar belakang biru
+              size: 60,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Pengajuan Berhasil!",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Permintaan Anda telah diajukan dan menunggu persetujuan Admin. Cek status di menu Riwayat.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                // Tombol Outlined terlihat lebih elegan di atas warna solid/gradien
+                onPressed: () {
+                  Navigator.pop(context); // Close Dialog
+                  Navigator.pop(context); // Back to Dashboard
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text("Kembali ke Dashboard"),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

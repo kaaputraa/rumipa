@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/booking_model.dart';
 import '../../services/booking_service.dart';
 
@@ -12,7 +13,6 @@ class BookingHistoryScreen extends StatefulWidget {
 
 class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
   final _bookingService = BookingService();
-  // Karena user_id dapat diakses melalui auth.currentUser, kita ambil langsung dari sana.
   final _userId = Supabase.instance.client.auth.currentUser!.id;
   late Future<List<BookingModel>> _bookingsFuture;
 
@@ -22,126 +22,304 @@ class _BookingHistoryScreenState extends State<BookingHistoryScreen> {
     _loadBookings();
   }
 
-  void _loadBookings() {
+  Future<void> _loadBookings() async {
     setState(() {
       _bookingsFuture = _bookingService.fetchUserBookings(_userId);
     });
+    // await future agar RefreshIndicator tahu kapan selesai
+    await _bookingsFuture;
   }
 
-  // PERBAIKAN 1: Tambahkan case 'completed'
+  // Helper untuk warna status
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
-        return Colors.blue; // Ubah dari hijau ke biru untuk ongoing
-      case 'completed': // <-- BARU
-        return Colors.green; // Warna hijau untuk selesai
+        return const Color(0xFF2962FF); // Electric Blue
+      case 'completed':
+        return Colors.green.shade600;
       case 'rejected':
-        return Colors.red;
+        return Colors.red.shade600;
       case 'pending':
       default:
-        return Colors.orange;
+        return Colors.orange.shade700;
     }
   }
 
-  // PERBAIKAN 2: Tambahkan case 'completed'
+  // Helper untuk teks status
   String _formatStatus(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
-        return 'Disetujui (Berlangsung)';
-      case 'completed': // <-- BARU
+        return 'Disetujui';
+      case 'completed':
         return 'Selesai';
       case 'rejected':
         return 'Ditolak';
-      case 'pending':
       default:
-        return 'Menunggu Persetujuan';
+        return 'Menunggu';
+    }
+  }
+
+  // Helper untuk icon status
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return Icons.event_available_rounded;
+      case 'completed':
+        return Icons.check_circle_rounded;
+      case 'rejected':
+        return Icons.cancel_rounded;
+      default:
+        return Icons.hourglass_top_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: theme.colorScheme.background,
       appBar: AppBar(
-        title: const Text('Riwayat Peminjaman'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadBookings),
-        ],
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Riwayat Peminjaman',
+          style: GoogleFonts.inter(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        centerTitle: false,
       ),
-      body: FutureBuilder<List<BookingModel>>(
-        future: _bookingsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Error memuat riwayat: ${snapshot.error}'),
-            );
-          }
-          if (snapshot.data == null || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text('Anda belum memiliki riwayat peminjaman.'),
-            );
-          }
+      body: RefreshIndicator(
+        onRefresh: _loadBookings,
+        color: theme.colorScheme.primary,
+        child: FutureBuilder<List<BookingModel>>(
+          future: _bookingsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
 
-          final bookings = snapshot.data!;
+            final bookings = snapshot.data ?? [];
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(10),
-            itemCount: bookings.length,
-            itemBuilder: (context, index) {
-              final booking = bookings[index];
-              final statusColor = _getStatusColor(booking.status);
-
-              // Format waktu peminjaman yang diajukan
-              final String bookingTime =
-                  '(${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)})';
-
-              // Ambil waktu pengajuan LOKAL
-              final DateTime? submittedTimeLocal = booking.createdAt?.toLocal();
-              final String timeSubmitted = submittedTimeLocal != null
-                  ? ' | Diajukan: ${submittedTimeLocal.hour.toString().padLeft(2, '0')}:${submittedTimeLocal.minute.toString().padLeft(2, '0')}'
-                  : '';
-
-              return Card(
-                elevation: 2,
-                margin: const EdgeInsets.only(bottom: 10),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: statusColor,
-                    child: Text(
-                      booking.status[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white),
+            if (bookings.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.history_toggle_off_rounded,
+                      size: 60,
+                      color: Colors.grey.shade300,
                     ),
-                  ),
-                  title: Text(
-                    // Gabungkan Tanggal Booking + Jam Booking + Jam Pengajuan (Lokal)
-                    '${booking.roomId} - ${booking.date.toIso8601String().substring(0, 10)} $bookingTime$timeSubmitted',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text('Keperluan: ${booking.purpose}'),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                    const SizedBox(height: 16),
+                    Text(
+                      "Belum ada riwayat peminjaman",
+                      style: GoogleFonts.inter(color: Colors.grey.shade500),
                     ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      _formatStatus(booking.status),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
               );
-            },
-          );
-        },
+            }
+
+            return ListView.separated(
+              padding: const EdgeInsets.all(20),
+              itemCount: bookings.length,
+              separatorBuilder: (ctx, index) => const SizedBox(height: 16),
+              itemBuilder: (context, index) {
+                return _buildHistoryCard(bookings[index]);
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryCard(BookingModel booking) {
+    final color = _getStatusColor(booking.status);
+    final statusText = _formatStatus(booking.status);
+    final icon = _getStatusIcon(booking.status);
+
+    // Parsing Tanggal untuk "Date Box"
+    // Format booking.date biasanya ISO string (YYYY-MM-DD...)
+    final dateObj = booking.date;
+    final day = dateObj.day.toString();
+    // Mendapatkan nama bulan singkat (Jan, Feb, dst) secara manual tanpa intl package biar aman
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "Mei",
+      "Jun",
+      "Jul",
+      "Agt",
+      "Sep",
+      "Okt",
+      "Nov",
+      "Des",
+    ];
+    final month = monthNames[dateObj.month - 1];
+
+    final timeString =
+        '${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)}';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. DATE BOX (Visual Tanggal)
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    day,
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    month,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // 2. MAIN CONTENT
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Judul Ruangan & Status Badge
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        booking.roomId,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: const Color(0xFF1A1C1E),
+                        ),
+                      ),
+                      // Status Badge Kecil
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(icon, size: 12, color: color),
+                            const SizedBox(width: 4),
+                            Text(
+                              statusText,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  // Jam
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        timeString,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Keperluan
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      booking.purpose,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
