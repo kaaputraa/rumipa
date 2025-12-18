@@ -35,6 +35,7 @@ class _UserDashboardState extends State<UserDashboard> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text("Batal"),
           ),
+          // Menggunakan TextButton yang default-nya primary color
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text("Keluar", style: TextStyle(color: Colors.red)),

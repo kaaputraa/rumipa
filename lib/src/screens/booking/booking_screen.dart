@@ -1,3 +1,5 @@
+// rumipa3/lib/src/screens/booking/booking_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -6,6 +8,8 @@ import '../../models/booking_model.dart';
 import '../../services/booking_service.dart';
 import '../../models/room_model.dart';
 import '../../services/room_service.dart';
+// Asumsi: Anda memiliki file ini untuk notifikasi yang lebih bagus
+import '../../widgets/custom_snackbar.dart';
 
 class BookingScreen extends StatefulWidget {
   final UserModel user;
@@ -38,10 +42,6 @@ class _BookingScreenState extends State<BookingScreen> {
   void initState() {
     super.initState();
     _roomsFuture = _roomService.fetchAllRooms();
-
-    // Default Tanggal hari ini agar langsung bisa pilih jam
-    // _selectedDate = DateTime.now();
-    // Tapi biarkan null dulu jika ingin memaksa user memilih
   }
 
   @override
@@ -128,16 +128,19 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _submit() async {
+    // [PERBAIKAN] Dapatkan Theme di awal function untuk digunakan dalam dialog
+    final theme = Theme.of(context);
+
     if (!_formKey.currentState!.validate() ||
         _selectedRoomName == null ||
         _selectedDate == null ||
         _startTime == null ||
         _endTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Harap lengkapi semua data form!'),
-          backgroundColor: Colors.red,
-        ),
+      // Menggunakan Custom SnackBar untuk pesan validasi
+      showCustomSnackBar(
+        context,
+        message: 'Harap lengkapi semua data form!',
+        isSuccess: false,
       );
       return;
     }
@@ -146,11 +149,11 @@ class _BookingScreenState extends State<BookingScreen> {
     if (_startTime!.hour > _endTime!.hour ||
         (_startTime!.hour == _endTime!.hour &&
             _startTime!.minute >= _endTime!.minute)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Jam selesai harus setelah jam mulai.'),
-          backgroundColor: Colors.orange,
-        ),
+      // Menggunakan Custom SnackBar untuk pesan validasi
+      showCustomSnackBar(
+        context,
+        message: 'Jam selesai harus setelah jam mulai.',
+        isSuccess: false,
       );
       return;
     }
@@ -172,9 +175,15 @@ class _BookingScreenState extends State<BookingScreen> {
       if (!isAvailable) {
         _fetchAvailabilityList();
         if (mounted) {
+          // Dialog Gagal yang ditingkatkan dengan Icon
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
+              icon: const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 36,
+              ),
               title: const Text("Gagal Booking"),
               content: const Text(
                 "Maaf, ruangan sudah terisi pada jam tersebut. Silakan cek jadwal di bawah.",
@@ -210,36 +219,16 @@ class _BookingScreenState extends State<BookingScreen> {
 
       if (!mounted) return;
 
-      // Success Dialog
+      // Success Dialog dengan Gradient Custom
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          icon: const Icon(
-            Icons.check_circle_rounded,
-            color: Colors.green,
-            size: 48,
-          ),
-          title: const Text("Berhasil Diajukan"),
-          content: const Text(
-            "Permintaan Anda sedang menunggu persetujuan Admin. Cek status di menu Riwayat.",
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx); // Close Dialog
-                Navigator.pop(context); // Back to Dashboard
-              },
-              child: const Text("Kembali ke Dashboard"),
-            ),
-          ],
-        ),
+        builder: (ctx) => _buildGradientSuccessDialog(ctx, theme),
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        // Menggunakan custom_snackbar untuk error umum
+        showCustomSnackBar(context, message: 'Error: $e', isSuccess: false);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -554,5 +543,80 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
       );
     }
+  }
+
+  // Widget helper untuk dialog sukses dengan gradien (Baru)
+  Widget _buildGradientSuccessDialog(BuildContext context, ThemeData theme) {
+    return Dialog(
+      // Membulatkan sudut dialog
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 10,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          // >>> IMPLEMENTASI GRADIENT <<<
+          gradient: LinearGradient(
+            colors: [theme.colorScheme.primary, Colors.lightBlue.shade300],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.primary.withOpacity(0.4),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.check_circle_outline_rounded,
+              color: Colors
+                  .white, // Ikon Putih agar kontras di latar belakang biru
+              size: 60,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Pengajuan Berhasil!",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "Permintaan Anda telah diajukan dan menunggu persetujuan Admin. Cek status di menu Riwayat.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                // Tombol Outlined terlihat lebih elegan di atas warna solid/gradien
+                onPressed: () {
+                  Navigator.pop(context); // Close Dialog
+                  Navigator.pop(context); // Back to Dashboard
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text("Kembali ke Dashboard"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

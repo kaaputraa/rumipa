@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../services/booking_service.dart';
 import '../../services/storage_service.dart';
 import '../../models/booking_model.dart';
+import 'package:rumipa3/src/widgets/custom_snackbar.dart';
 
 // =========================================================
 // ADMIN DASHBOARD UTAMA (3 TAB)
@@ -140,22 +141,16 @@ class _BookingListWidgetState extends State<BookingListWidget> {
         newStatus: newStatus,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Status berhasil diubah ke ${newStatus.toUpperCase()}',
-            ),
-            backgroundColor: Colors.green.shade600,
-            behavior: SnackBarBehavior.floating,
-          ),
+        showCustomSnackBar(
+          context,
+          message: 'Status berhasil diubah ke ${newStatus.toUpperCase()}',
+          isSuccess: true,
         );
       }
       _loadBookings();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showCustomSnackBar(context, message: 'Error: $e', isSuccess: false);
       }
     }
   }

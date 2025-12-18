@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+// Import Screens & Services
 import '../home/user_dashboard.dart';
 import '../home/admin_dashboard.dart';
 import 'register_screen.dart';
+import '../../services/auth_service.dart'; // Import AuthService
+import '../../widgets/custom_snackbar.dart'; // Import CustomSnackBar
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,8 +19,11 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final emailC = TextEditingController();
   final passwordC = TextEditingController();
+
   bool loading = false;
   bool _isPasswordVisible = false;
+
+  final _authService = AuthService(); // Inisiasi AuthService
 
   // --- LOGIC AUTHENTICATION (Tetap Sama) ---
   Future<void> login() async {
@@ -58,22 +65,133 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login gagal: $e')));
+      // Menggunakan Custom SnackBar untuk pesan error
+      showCustomSnackBar(context, message: 'Login gagal: $e', isSuccess: false);
     } finally {
       if (mounted) setState(() => loading = false);
     }
   }
 
+  // =============================================
+  // FUNGSI BARU: MENAMPILKAN DIALOG RESET PASSWORD
+  // =============================================
+  void _showResetPasswordDialog() {
+    final resetEmailC = TextEditingController();
+    final theme = Theme.of(context);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        bool isLoading = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Lupa Kata Sandi"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Masukkan email Anda. Kami akan mengirimkan link untuk mereset kata sandi.",
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  // Menggunakan TextField dengan styling yang konsisten
+                  TextField(
+                    controller: resetEmailC,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: "Email",
+                      prefixIcon: Icon(
+                        Icons.email_outlined,
+                        color: theme.colorScheme.primary,
+                      ),
+                      // Menggunakan styling TextField yang sudah Anda definisikan di main.dart
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Batal"),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          if (resetEmailC.text.isEmpty ||
+                              !resetEmailC.text.contains('@')) {
+                            showCustomSnackBar(
+                              context,
+                              message: "Masukkan email yang valid.",
+                              isSuccess: false,
+                            );
+                            return;
+                          }
+
+                          setState(() => isLoading = true);
+
+                          try {
+                            await _authService.resetPassword(
+                              email: resetEmailC.text.trim(),
+                            );
+
+                            if (!mounted) return;
+
+                            Navigator.pop(ctx); // Tutup dialog
+
+                            // Gunakan Custom SnackBar untuk pesan sukses
+                            showCustomSnackBar(
+                              context,
+                              message:
+                                  "Link reset telah dikirim ke email ${resetEmailC.text.trim()}. Periksa kotak masuk Anda.",
+                              isSuccess: true,
+                            );
+                          } catch (e) {
+                            if (!mounted) return;
+                            showCustomSnackBar(
+                              context,
+                              message: e.toString().replaceFirst(
+                                'Exception: ',
+                                '',
+                              ),
+                              isSuccess: false,
+                            );
+                          } finally {
+                            if (mounted) setState(() => isLoading = false);
+                          }
+                        },
+                  child: isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text("Kirim Link"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Definisi Warna dari Figma [cite: 24, 42, 105]
+    // Definisi Warna dari Figma
     const colorPrimaryBlue = Color(0xFF135BDA);
     const colorDarkBlue = Color(0xFF0F4BB5);
     const colorTextGray = Color(0xFF4E5153);
     const colorBorder = Color(0xFFCED4DA);
-    const colorBg = Color(0xFFFAFAFB); // [cite: 1]
+    const colorBg = Color(0xFFFAFAFB);
 
     return Scaffold(
       backgroundColor: colorBg,
@@ -89,31 +207,31 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 // 1. HEADER
                 Text(
-                  'Login here', // [cite: 23]
+                  'Login here',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
-                    color: colorDarkBlue, // [cite: 24]
-                    fontSize: 34, // [cite: 25]
-                    fontWeight: FontWeight.w800, // [cite: 26]
+                    color: colorDarkBlue,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 16), // Spacing dari Figma: 16 [cite: 22]
+                const SizedBox(height: 16),
 
                 SizedBox(
-                  width: 210, // Membatasi lebar teks sesuai Figma [cite: 27]
+                  width: 210,
                   child: Text(
-                    'Welcome back you’ve been missed!', // [cite: 28]
+                    'Welcome back you’ve been missed!',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
-                      color: Colors.black, // [cite: 29]
-                      fontSize: 14, // [cite: 30]
+                      color: Colors.black,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      height: 1.4, // Line height Figma [cite: 31]
+                      height: 1.4,
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 48), // Spacing antar section
+                const SizedBox(height: 48),
                 // 2. FORM INPUTS
                 // Email Field
                 _buildTextField(
@@ -123,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   textColor: colorTextGray,
                 ),
 
-                const SizedBox(height: 22), // Spacing 22 [cite: 36]
+                const SizedBox(height: 22),
                 // Password Field
                 _buildTextField(
                   controller: passwordC,
@@ -153,36 +271,32 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: GestureDetector(
-                    onTap: () {
-                      // TODO: Implement forgot password
-                    },
+                    onTap:
+                        _showResetPasswordDialog, // PANGGIL FUNGSI RESET DI SINI
                     child: Text(
-                      'Forgot your password?', // Fixed typo "yor" -> "your" [cite: 104]
+                      'Forgot your password?',
                       style: GoogleFonts.inter(
-                        color: colorPrimaryBlue, // [cite: 105]
-                        fontSize: 12, // [cite: 106]
-                        fontWeight:
-                            FontWeight.w600, // Sedikit lebih tebal agar terbaca
+                        color: colorPrimaryBlue,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 32), // Spacing 32 [cite: 21]
+                const SizedBox(height: 32),
                 // 3. LOGIN BUTTON
                 SizedBox(
                   width: double.infinity, // Responsif: Full width parent
-                  height: 48, // Tinggi dari Figma [cite: 109]
+                  height: 48,
                   child: ElevatedButton(
                     onPressed: loading ? null : login,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: colorPrimaryBlue, // [cite: 110]
-                      foregroundColor: const Color(
-                        0xFFECF3FA,
-                      ), // Warna Teks [cite: 115]
-                      elevation: 0, // Desain Figma flat
+                      backgroundColor: colorPrimaryBlue,
+                      foregroundColor: const Color(0xFFECF3FA),
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12), // [cite: 111]
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: loading
@@ -195,10 +309,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           )
                         : Text(
-                            'Sign in', // [cite: 113]
+                            'Sign in',
                             style: GoogleFonts.inter(
-                              fontSize: 16, // [cite: 115]
-                              fontWeight: FontWeight.w700, // [cite: 116]
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                   ),
@@ -215,12 +329,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                   },
                   child: Text(
-                    'Create an account', // [cite: 121]
+                    'Create an account',
                     style: GoogleFonts.poppins(
                       // Figma pakai Poppins disini
-                      color: colorPrimaryBlue, // [cite: 122]
+                      color: colorPrimaryBlue,
                       fontSize: 14,
-                      fontWeight: FontWeight.w600, // [cite: 124]
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -244,7 +358,7 @@ class _LoginScreenState extends State<LoginScreen> {
     Widget? suffixicon,
   }) {
     return Container(
-      // Container dekorasi sesuai Figma [cite: 37-44]
+      // Container dekorasi sesuai Figma
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -258,27 +372,24 @@ class _LoginScreenState extends State<LoginScreen> {
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
-          hintText: label, // [cite: 54, 82]
+          hintText: label,
           hintStyle: GoogleFonts.inter(
-            color: textColor, // [cite: 56]
+            color: textColor,
             fontSize: 14,
-            fontWeight: FontWeight.w500, // [cite: 58]
+            fontWeight: FontWeight.w500,
           ),
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 17,
-            vertical: 18, // Padding Figma [cite: 39]
+            vertical: 18, // Padding Figma
           ),
           // icon mata
           suffixIcon: suffixicon,
           // Border saat normal
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12), // [cite: 43]
-            borderSide: BorderSide(
-              color: borderColor,
-              width: 1,
-            ), // [cite: 41-42]
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: borderColor, width: 1),
           ),
           // Border saat diklik (Focus) - biasanya lebih gelap/biru
           focusedBorder: OutlineInputBorder(

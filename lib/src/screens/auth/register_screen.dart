@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // [PENTING] Untuk memblokir input huruf
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:rumipa3/src/widgets/custom_snackbar.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -70,29 +71,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
           .select()
           .single();
 
+      // Success
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Registrasi berhasil. Silakan login.'),
-          backgroundColor: Colors.green.shade600,
-        ),
+      showCustomSnackBar(
+        context,
+        message: 'Registrasi berhasil. Silakan login.',
+        isSuccess: true,
       );
 
       Navigator.pop(context); // Kembali ke Login
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.message}'),
-          backgroundColor: Colors.red,
-        ),
+      showCustomSnackBar(
+        context,
+        message: 'Error: ${e.message}',
+        isSuccess: false,
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      showCustomSnackBar(context, message: 'Error: $e', isSuccess: false);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
