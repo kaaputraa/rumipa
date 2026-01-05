@@ -1,5 +1,3 @@
-// rumipa3/lib/src/screens/booking/booking_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -7,13 +5,18 @@ import '../../models/user_model.dart';
 import '../../models/booking_model.dart';
 import '../../services/booking_service.dart';
 import '../../models/room_model.dart';
-import '../../services/room_service.dart';
-// Asumsi: Anda memiliki file ini untuk notifikasi yang lebih bagus
+// import '../../services/room_service.dart'; // Tidak lagi dibutuhkan di sini jika hanya menampilkan nama
 import '../../widgets/custom_snackbar.dart';
 
 class BookingScreen extends StatefulWidget {
   final UserModel user;
-  const BookingScreen({super.key, required this.user});
+  final RoomModel selectedRoom; // [BARU] Menerima data room
+
+  const BookingScreen({
+    super.key,
+    required this.user,
+    required this.selectedRoom, // [BARU] Wajib diisi
+  });
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -22,17 +25,17 @@ class BookingScreen extends StatefulWidget {
 class _BookingScreenState extends State<BookingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _bookingService = BookingService();
-  final _roomService = RoomService();
+
   bool _isLoading = false;
 
   // Data
-  Future<List<RoomModel>>? _roomsFuture;
   List<BookingModel> _approvedBookings = [];
   bool _isFetchingAvailability = false;
   String? _availabilityFetchError;
 
   // Form Values
-  String? _selectedRoomName;
+  late String
+  _selectedRoomName; // [UBAH] Menjadi late karena diisi di initState
   final _purposeCtrl = TextEditingController();
   DateTime? _selectedDate;
   TimeOfDay? _startTime;
@@ -41,7 +44,8 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   void initState() {
     super.initState();
-    _roomsFuture = _roomService.fetchAllRooms();
+    // [BARU] Set ruangan langsung dari parameter widget
+    _selectedRoomName = widget.selectedRoom.name;
   }
 
   @override
@@ -51,7 +55,8 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _fetchAvailabilityList() async {
-    if (_selectedRoomName == null || _selectedDate == null) {
+    // _selectedRoomName pasti ada, jadi cek date saja
+    if (_selectedDate == null) {
       setState(() => _approvedBookings = []);
       return;
     }
@@ -64,7 +69,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
     try {
       final list = await _bookingService.fetchUnavailableBookings(
-        roomId: _selectedRoomName!,
+        roomId: _selectedRoomName,
         date: _selectedDate!,
       );
       if (mounted) setState(() => _approvedBookings = list);
@@ -128,15 +133,12 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _submit() async {
-    // [PERBAIKAN] Dapatkan Theme di awal function untuk digunakan dalam dialog
     final theme = Theme.of(context);
 
     if (!_formKey.currentState!.validate() ||
-        _selectedRoomName == null ||
         _selectedDate == null ||
         _startTime == null ||
         _endTime == null) {
-      // Menggunakan Custom SnackBar untuk pesan validasi
       showCustomSnackBar(
         context,
         message: 'Harap lengkapi semua data form!',
@@ -145,11 +147,9 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
-    // Validasi Waktu
     if (_startTime!.hour > _endTime!.hour ||
         (_startTime!.hour == _endTime!.hour &&
             _startTime!.minute >= _endTime!.minute)) {
-      // Menggunakan Custom SnackBar untuk pesan validasi
       showCustomSnackBar(
         context,
         message: 'Jam selesai harus setelah jam mulai.',
@@ -164,9 +164,8 @@ class _BookingScreenState extends State<BookingScreen> {
       final startTimeStr = _timeOfDayToString(_startTime!);
       final endTimeStr = _timeOfDayToString(_endTime!);
 
-      // Cek Konflik Final
       final isAvailable = await _bookingService.checkAvailability(
-        roomId: _selectedRoomName!,
+        roomId: _selectedRoomName,
         date: _selectedDate!,
         startTime: startTimeStr,
         endTime: endTimeStr,
@@ -175,7 +174,6 @@ class _BookingScreenState extends State<BookingScreen> {
       if (!isAvailable) {
         _fetchAvailabilityList();
         if (mounted) {
-          // Dialog Gagal yang ditingkatkan dengan Icon
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -200,10 +198,9 @@ class _BookingScreenState extends State<BookingScreen> {
         return;
       }
 
-      // Submit
       final booking = BookingModel(
         userId: widget.user.id,
-        roomId: _selectedRoomName!,
+        roomId: _selectedRoomName,
         userName: widget.user.name,
         nim: widget.user.nim,
         phone: widget.user.phone,
@@ -219,7 +216,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
       if (!mounted) return;
 
-      // Success Dialog dengan Gradient Custom
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -227,7 +223,6 @@ class _BookingScreenState extends State<BookingScreen> {
       );
     } catch (e) {
       if (mounted) {
-        // Menggunakan custom_snackbar untuk error umum
         showCustomSnackBar(context, message: 'Error: $e', isSuccess: false);
       }
     } finally {
@@ -250,204 +245,179 @@ class _BookingScreenState extends State<BookingScreen> {
         elevation: 0,
         foregroundColor: Colors.black,
       ),
-      body: FutureBuilder<List<RoomModel>>(
-        future: _roomsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("Tidak ada data ruangan."));
-          }
-
-          final roomOptions = snapshot.data!;
-
-          // Auto select first room if null
-          if (_selectedRoomName == null && roomOptions.isNotEmpty) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              setState(() {
-                _selectedRoomName = roomOptions.first.name;
-              });
-            });
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. INFORMASI PEMINJAM (Read Only Card)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade100),
+      // [PERBAIKAN] Hapus FutureBuilder, langsung tampilkan Form
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. INFORMASI PEMINJAM (Read Only Card)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade100),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.account_circle_rounded,
+                      color: Colors.blue,
+                      size: 40,
                     ),
-                    child: Row(
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.account_circle_rounded,
-                          color: Colors.blue,
-                          size: 40,
+                        Text(
+                          widget.user.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(width: 16),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.user.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              "${widget.user.nim}  •  ${widget.user.phone}",
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
+                        Text(
+                          "${widget.user.nim}  •  ${widget.user.phone}",
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ],
                     ),
-                  ),
+                  ],
+                ),
+              ),
 
-                  const SizedBox(height: 24),
-                  Text(
-                    "Detail Peminjaman",
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+              const SizedBox(height: 24),
+              Text(
+                "Detail Peminjaman",
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 2. RUANGAN (READ ONLY / LOCKED)
+              // [PERBAIKAN] Mengganti Dropdown dengan TextFormField ReadOnly
+              TextFormField(
+                initialValue: widget.selectedRoom.name,
+                readOnly: true, // Tidak bisa diedit
+                decoration: const InputDecoration(
+                  labelText: "Ruangan",
+                  prefixIcon: Icon(Icons.meeting_room_outlined),
+                  border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Color(
+                    0xFFEEEEEE,
+                  ), // Warna abu-abu menandakan disabled
+                ),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 3. KEPERLUAN
+              TextFormField(
+                controller: _purposeCtrl,
+                maxLines: 2,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: "Keperluan Acara",
+                  prefixIcon: Icon(Icons.description_outlined),
+                  alignLabelWithHint: true,
+                ),
+                validator: (v) => v!.isEmpty ? "Wajib diisi" : null,
+              ),
+
+              const SizedBox(height: 16),
+
+              // 4. TANGGAL
+              InkWell(
+                onTap: _selectDate,
+                borderRadius: BorderRadius.circular(16),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: "Tanggal Peminjaman",
+                    prefixIcon: Icon(Icons.calendar_month_outlined),
+                  ),
+                  child: Text(
+                    _selectedDate == null
+                        ? "Pilih Tanggal"
+                        : _selectedDate!.toIso8601String().substring(0, 10),
+                    style: TextStyle(
+                      color: _selectedDate == null
+                          ? Colors.grey.shade600
+                          : Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                ),
+              ),
 
-                  // 2. PILIH RUANGAN (Dropdown)
-                  DropdownButtonFormField<String>(
-                    value: _selectedRoomName,
-                    items: roomOptions
-                        .map(
-                          (room) => DropdownMenuItem(
-                            value: room.name,
-                            child: Text(room.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedRoomName = value);
-                      _fetchAvailabilityList();
-                    },
-                    decoration: const InputDecoration(
-                      labelText: "Pilih Ruangan",
-                      prefixIcon: Icon(Icons.meeting_room_outlined),
-                    ),
-                  ),
+              const SizedBox(height: 16),
 
-                  const SizedBox(height: 16),
-
-                  // 3. KEPERLUAN
-                  TextFormField(
-                    controller: _purposeCtrl,
-                    maxLines: 2,
-                    textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(
-                      labelText: "Keperluan Acara",
-                      prefixIcon: Icon(Icons.description_outlined),
-                      alignLabelWithHint: true,
-                    ),
-                    validator: (v) => v!.isEmpty ? "Wajib diisi" : null,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 4. TANGGAL
-                  InkWell(
-                    onTap: _selectDate,
-                    borderRadius: BorderRadius.circular(16),
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: "Tanggal Peminjaman",
-                        prefixIcon: Icon(Icons.calendar_month_outlined),
-                      ),
-                      child: Text(
-                        _selectedDate == null
-                            ? "Pilih Tanggal"
-                            : _selectedDate!.toIso8601String().substring(0, 10),
-                        style: TextStyle(
-                          color: _selectedDate == null
-                              ? Colors.grey.shade600
-                              : Colors.black87,
+              // 5. JAM MULAI & SELESAI (Row)
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _selectTime(true),
+                      borderRadius: BorderRadius.circular(16),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: "Jam Mulai",
+                          prefixIcon: Icon(Icons.schedule),
                         ),
+                        child: Text(_startTime?.format(context) ?? "--:--"),
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 16),
-
-                  // 5. JAM MULAI & SELESAI (Row)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => _selectTime(true),
-                          borderRadius: BorderRadius.circular(16),
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: "Jam Mulai",
-                              prefixIcon: Icon(Icons.schedule),
-                            ),
-                            child: Text(_startTime?.format(context) ?? "--:--"),
-                          ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _selectTime(false),
+                      borderRadius: BorderRadius.circular(16),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: "Jam Selesai",
+                          prefixIcon: Icon(Icons.schedule),
                         ),
+                        child: Text(_endTime?.format(context) ?? "--:--"),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => _selectTime(false),
-                          borderRadius: BorderRadius.circular(16),
-                          child: InputDecorator(
-                            decoration: const InputDecoration(
-                              labelText: "Jam Selesai",
-                              prefixIcon: Icon(Icons.schedule),
-                            ),
-                            child: Text(_endTime?.format(context) ?? "--:--"),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // 6. AVAILABILITY STATUS (Dynamic UI)
-                  if (_selectedRoomName != null && _selectedDate != null)
-                    _buildAvailabilityStatus(),
-
-                  const SizedBox(height: 32),
-
-                  // 7. SUBMIT BUTTON
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: FilledButton(
-                      onPressed: _isLoading ? null : _submit,
-                      child: _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              "Ajukan Booking",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
                     ),
                   ),
                 ],
               ),
-            ),
-          );
-        },
+
+              const SizedBox(height: 32),
+
+              // 6. AVAILABILITY STATUS (Dynamic UI)
+              // Logic check: Room sudah pasti terpilih, tinggal cek tanggal
+              if (_selectedDate != null) _buildAvailabilityStatus(),
+
+              const SizedBox(height: 32),
+
+              // 7. SUBMIT BUTTON
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: FilledButton(
+                  onPressed: _isLoading ? null : _submit,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          "Ajukan Booking",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -545,17 +515,14 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  // Widget helper untuk dialog sukses dengan gradien (Baru)
   Widget _buildGradientSuccessDialog(BuildContext context, ThemeData theme) {
     return Dialog(
-      // Membulatkan sudut dialog
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       elevation: 10,
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          // >>> IMPLEMENTASI GRADIENT <<<
           gradient: LinearGradient(
             colors: [theme.colorScheme.primary, Colors.lightBlue.shade300],
             begin: Alignment.topLeft,
@@ -574,8 +541,7 @@ class _BookingScreenState extends State<BookingScreen> {
           children: [
             const Icon(
               Icons.check_circle_outline_rounded,
-              color: Colors
-                  .white, // Ikon Putih agar kontras di latar belakang biru
+              color: Colors.white,
               size: 60,
             ),
             const SizedBox(height: 16),
@@ -598,7 +564,6 @@ class _BookingScreenState extends State<BookingScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                // Tombol Outlined terlihat lebih elegan di atas warna solid/gradien
                 onPressed: () {
                   Navigator.pop(context); // Close Dialog
                   Navigator.pop(context); // Back to Dashboard

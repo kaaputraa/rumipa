@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // [PENTING] Untuk memblokir input huruf
+import 'package:rumipa3/src/core/validators.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/auth_service.dart'; // Pastikan path ini sesuai dengan struktur folder Anda
 
@@ -150,8 +152,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: "Full Name",
                     borderColor: colorBorder,
                     textColor: colorTextGray,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Nama wajib diisi' : null,
+                    validator: AppValidators.validateName,
                   ),
                   const SizedBox(height: 22),
 
@@ -162,6 +163,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     borderColor: colorBorder,
                     textColor: colorTextGray,
                     isNumber: true,
+                    validator: AppValidators.validateNIM,
                     validator: (v) =>
                         v == null || v.isEmpty ? 'NIM wajib diisi' : null,
                   ),
@@ -173,9 +175,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: "Email",
                     borderColor: colorBorder,
                     textColor: colorTextGray,
-                    validator: (v) => v == null || !v.contains('@')
-                        ? 'Email tidak valid'
-                        : null,
+                    validator: AppValidators.validateEmail,
                   ),
                   const SizedBox(height: 22),
 
@@ -192,8 +192,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         _isPasswordVisible = !_isPasswordVisible;
                       });
                     },
-                    validator: (v) =>
-                        v == null || v.length < 6 ? 'Minimal 6 karakter' : null,
+                    validator: AppValidators.validatePassword,
                   ),
                   const SizedBox(height: 22),
 

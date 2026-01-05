@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'src/core/session_handler.dart';
 import 'src/screens/auth/login_screen.dart'; // Pastikan import sesuai
 
@@ -11,6 +12,9 @@ void main() async {
     anonKey:
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkYWxiZXFxdHd5aGRnYmVtemxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzE0MDIsImV4cCI6MjA4MDI0NzQwMn0.ohv1WHroUb46Kv1TlzZVg5qlCvt7ODpu41sMPFnv-6U',
   );
+
+  await initializeDateFormatting('id_ID', null);
+
   runApp(MyApp());
 }
 

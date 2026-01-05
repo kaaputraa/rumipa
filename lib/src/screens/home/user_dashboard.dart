@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../services/user_service.dart';
 import '../../models/user_model.dart';
 import '../profile/update_profile_screen.dart';
 import '../booking/booking_history_screen.dart';
-import '../booking/booking_screen.dart';
+import '../booking/room_list_screen.dart'; // Pastikan import screen daftar ruangan ini ada
 
 class UserDashboard extends StatefulWidget {
   const UserDashboard({super.key});
@@ -24,6 +25,13 @@ class _UserDashboardState extends State<UserDashboard> {
     _profileFuture = _userService.fetchCurrentUserProfile();
   }
 
+  /// Fungsi refresh data (dipanggil setelah kembali dari screen lain)
+  void _refreshProfile() {
+    setState(() {
+      _profileFuture = _userService.fetchCurrentUserProfile();
+    });
+  }
+
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -35,7 +43,6 @@ class _UserDashboardState extends State<UserDashboard> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text("Batal"),
           ),
-          // Menggunakan TextButton yang default-nya primary color
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text("Keluar", style: TextStyle(color: Colors.red)),
@@ -52,30 +59,26 @@ class _UserDashboardState extends State<UserDashboard> {
     }
   }
 
+  // Navigasi ke Edit Profil
   void _navigateToUpdateProfile() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const UpdateProfileScreen()),
     );
-    if (result == true || result == null) {
-      setState(() {
-        _profileFuture = _userService.fetchCurrentUserProfile();
-      });
-    }
+    _refreshProfile();
   }
 
+  // Navigasi ke Riwayat
   void _navigateToBookingHistory() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const BookingHistoryScreen()),
-    ).then((_) {
-      setState(() {
-        _profileFuture = _userService.fetchCurrentUserProfile();
-      });
-    });
+    );
   }
 
+  // Navigasi ke Peminjaman (Lewat Room List dulu)
   void _checkAndNavigateToBooking(UserModel user) {
+    // 1. Cek kelengkapan data
     if (user.phone.isEmpty || user.ktmPath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -92,14 +95,15 @@ class _UserDashboardState extends State<UserDashboard> {
         ),
       );
     } else {
+      // 2. Jika lengkap, buka daftar ruangan
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => BookingScreen(user: user)),
-      );
+        MaterialPageRoute(builder: (_) => RoomListScreen(user: user)),
+      ).then((_) => _refreshProfile());
     }
   }
 
-  // Helper untuk mengambil nama belakang saja
+  // Helper: Ambil nama belakang
   String _getLastName(String fullName) {
     if (fullName.isEmpty) return "User";
     List<String> parts = fullName.trim().split(' ');
@@ -111,7 +115,7 @@ class _UserDashboardState extends State<UserDashboard> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: const Color(0xFFFAFAFB), // Background abu-abu muda
       body: FutureBuilder<UserModel>(
         future: _profileFuture,
         builder: (context, snapshot) {
@@ -127,7 +131,6 @@ class _UserDashboardState extends State<UserDashboard> {
           final isProfileComplete =
               user.phone.isNotEmpty && user.ktmPath.isNotEmpty;
 
-          // Ambil nama belakang
           final lastName = _getLastName(user.name);
 
           return SafeArea(
@@ -140,29 +143,24 @@ class _UserDashboardState extends State<UserDashboard> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Menggunakan Expanded agar teks tidak menabrak tombol logout
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "Selamat Datang, $lastName", // Nama Belakang
-                              maxLines: 1, // Batasi 1 baris
-                              overflow: TextOverflow
-                                  .ellipsis, // Titik-titik jika kepanjangan
+                              "Selamat Datang, $lastName",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
                                 fontSize: 20,
-                                fontWeight: FontWeight
-                                    .bold, // Sedikit ditebalkan agar bagus
+                                fontWeight: FontWeight.bold,
                                 color: Colors.black,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(
-                        width: 16,
-                      ), // Jarak aman antara teks dan tombol
+                      const SizedBox(width: 16),
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -287,10 +285,9 @@ class _UserDashboardState extends State<UserDashboard> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 3. MENU LIST (Vertical Stack)
-                  // Semua button sekarang Full Width & seragam
+                  // 3. MENU LIST (Vertical Stack - Full Width)
 
-                  // Menu 1: Peminjaman
+                  // Menu 1: Pinjam Ruangan -> ke RoomListScreen
                   _buildMenuCard(
                     context: context,
                     title: "Pinjam Ruangan",
@@ -298,12 +295,11 @@ class _UserDashboardState extends State<UserDashboard> {
                     icon: Icons.meeting_room_rounded,
                     color: theme.colorScheme.primary,
                     onTap: () => _checkAndNavigateToBooking(user),
-                    isPrimary: true, // Ada arrow icon
                   ),
 
                   const SizedBox(height: 16),
 
-                  // Menu 2: Riwayat (Full Width)
+                  // Menu 2: Riwayat -> ke BookingHistoryScreen
                   _buildMenuCard(
                     context: context,
                     title: "Riwayat Peminjaman",
@@ -311,12 +307,11 @@ class _UserDashboardState extends State<UserDashboard> {
                     icon: Icons.history_rounded,
                     color: Colors.purple,
                     onTap: _navigateToBookingHistory,
-                    isPrimary: true, // Ada arrow icon agar seragam
                   ),
 
                   const SizedBox(height: 16),
 
-                  // Menu 3: Profil (Full Width)
+                  // Menu 3: Profil -> ke UpdateProfileScreen
                   _buildMenuCard(
                     context: context,
                     title: "Profil Saya",
@@ -324,10 +319,9 @@ class _UserDashboardState extends State<UserDashboard> {
                     icon: Icons.person_outline_rounded,
                     color: Colors.teal,
                     onTap: _navigateToUpdateProfile,
-                    isPrimary: true, // Ada arrow icon agar seragam
                   ),
 
-                  const SizedBox(height: 32), // Extra padding bottom
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -337,7 +331,7 @@ class _UserDashboardState extends State<UserDashboard> {
     );
   }
 
-  // Helper Widget
+  // Helper Widget untuk Menu Card
   Widget _buildMenuCard({
     required BuildContext context,
     required String title,
@@ -345,7 +339,6 @@ class _UserDashboardState extends State<UserDashboard> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
-    bool isPrimary = false,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -372,7 +365,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: 32), // Ukuran icon seragam
+              child: Icon(icon, color: color, size: 32),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -398,13 +391,11 @@ class _UserDashboardState extends State<UserDashboard> {
                 ],
               ),
             ),
-            // Selalu tampilkan panah jika isPrimary true (sekarang semua true)
-            if (isPrimary)
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: Colors.grey.shade300,
-              ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: Colors.grey.shade300,
+            ),
           ],
         ),
       ),
