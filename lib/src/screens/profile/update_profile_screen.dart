@@ -4,10 +4,10 @@ import 'package:flutter/services.dart'; // [PENTING] Tambahan import untuk filte
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import '../../models/user_model.dart';
 import '../../services/user_service.dart';
 import '../../services/storage_service.dart';
+import 'package:rumipa3/src/widgets/custom_snackbar.dart';
 
 class UpdateProfileScreen extends StatefulWidget {
   const UpdateProfileScreen({super.key});
@@ -53,9 +53,11 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
+        showCustomSnackBar(
           context,
-        ).showSnackBar(SnackBar(content: Text('Gagal memuat profil: $e')));
+          message: 'Gagal memuat profil: $e',
+          isSuccess: false,
+        );
       }
     }
   }
@@ -73,12 +75,12 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate() || _user == null) return;
 
-    if (_user!.ktmPath.isEmpty && _newKtmFile == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Silakan upload Foto KTM')));
-      return;
-    }
+    // if (_user!.ktmPath.isEmpty && _newKtmFile == null) {
+    //   ScaffoldMessenger.of(
+    //     context,
+    //   ).showSnackBar(const SnackBar(content: Text('Silakan upload Foto KTM')));
+    //   return;
+    // }
 
     setState(() => _isSaving = true);
     String finalKtmPath = _user!.ktmPath;
@@ -99,19 +101,19 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
       );
 
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profil berhasil diperbarui!'),
-          backgroundColor: Colors.green,
-        ),
+      showCustomSnackBar(
+        context,
+        message: 'Profil berhasil diperbarui!',
+        isSuccess: true,
       );
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
+        showCustomSnackBar(
           context,
-        ).showSnackBar(SnackBar(content: Text('Gagal menyimpan profil: $e')));
+          message: 'Gagal menyimpan profil: $e',
+          isSuccess: false,
+        );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

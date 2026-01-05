@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // [PENTING] Untuk memblokir input huruf
+import 'package:rumipa3/src/core/validators.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:rumipa3/src/widgets/custom_snackbar.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -70,29 +72,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
           .select()
           .single();
 
+      // Success
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Registrasi berhasil. Silakan login.'),
-          backgroundColor: Colors.green.shade600,
-        ),
+      showCustomSnackBar(
+        context,
+        message: 'Registrasi berhasil. Silakan login.',
+        isSuccess: true,
       );
 
       Navigator.pop(context); // Kembali ke Login
     } on AuthException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.message}'),
-          backgroundColor: Colors.red,
-        ),
+      showCustomSnackBar(
+        context,
+        message: 'Error: ${e.message}',
+        isSuccess: false,
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      showCustomSnackBar(context, message: 'Error: $e', isSuccess: false);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -150,8 +148,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: "Full Name",
                     borderColor: colorBorder,
                     textColor: colorTextGray,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Nama wajib diisi' : null,
+                    validator: AppValidators.validateName,
                   ),
                   const SizedBox(height: 22),
 
@@ -161,9 +158,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: "NIM",
                     borderColor: colorBorder,
                     textColor: colorTextGray,
-                    isNumber: true, // <--- Ini kuncinya
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'NIM wajib diisi' : null,
+                    isNumber: true,
+                    validator: AppValidators.validateNIM,
                   ),
                   const SizedBox(height: 22),
 
@@ -173,9 +169,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     label: "Email",
                     borderColor: colorBorder,
                     textColor: colorTextGray,
-                    validator: (v) => v == null || !v.contains('@')
-                        ? 'Email tidak valid'
-                        : null,
+                    validator: AppValidators.validateEmail,
                   ),
                   const SizedBox(height: 22),
 
@@ -192,8 +186,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         _isPasswordVisible = !_isPasswordVisible;
                       });
                     },
-                    validator: (v) =>
-                        v == null || v.length < 6 ? 'Minimal 6 karakter' : null,
+                    validator: AppValidators.validatePassword,
                   ),
                   const SizedBox(height: 22),
 
