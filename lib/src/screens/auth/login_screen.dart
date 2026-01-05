@@ -66,7 +66,11 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       // Menggunakan Custom SnackBar untuk pesan error
-      showCustomSnackBar(context, message: 'Login gagal: $e', isSuccess: false);
+      showCustomSnackBar(
+        context,
+        message: 'Login gagal: Password atau Email anda salah.',
+        isSuccess: false,
+      );
     } finally {
       if (mounted) setState(() => loading = false);
     }
