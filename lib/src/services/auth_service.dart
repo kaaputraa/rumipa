@@ -9,28 +9,27 @@ class AuthService {
   Future<void> signUpAndCreateProfile({
     required String email,
     required String password,
-    required String name,
-    required String nim,
+    required String name, // Data ini akan dikirim ke Metadata
+    required String nim, // Data ini akan dikirim ke Metadata
   }) async {
     try {
-      final response = await _client.auth.signUp(
+      // 1. Daftar ke Supabase Auth & Kirim Metadata
+      await _client.auth.signUp(
         email: email,
         password: password,
+        data: {
+          'name': name, // Metadata ditangkap oleh Trigger SQL
+          'nim': nim, // Metadata ditangkap oleh Trigger SQL
+        },
+        // URL ini harus cocok dengan yang didaftarkan di Dashboard
+        emailRedirectTo: 'io.supabase.flutter.rumipa3://login-callback',
       );
 
-      final user = response.user;
-      if (user == null) throw Exception('Signup failed');
-
-      await _client.from('users').insert({
-        'id': user.id,
-        'name': name,
-        'email': email,
-        'nim': nim,
-        'role': 'user',
-        'status': 'pending',
-      });
+      // 2. HAPUS kode manual insert ke tabel 'users'.
+      // JANGAN ADA KODE: await _client.from('users').insert(...)
+      // Biarkan Trigger database yang bekerja.
     } catch (e) {
-      throw Exception(e.toString());
+      throw Exception(e.toString()); // Lempar error ke UI jika gagal
     }
   }
 
