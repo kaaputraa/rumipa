@@ -164,8 +164,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     textColor: colorTextGray,
                     isNumber: true,
                     validator: AppValidators.validateNIM,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'NIM wajib diisi' : null,
                   ),
                   const SizedBox(height: 22),
 

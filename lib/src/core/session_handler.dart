@@ -57,42 +57,27 @@ class _SessionHandlerState extends State<SessionHandler> {
     final uid = _session!.user.id;
 
     try {
-      /// Coba ambil user berdasarkan ID
+      // Cukup SELECT saja. Tidak perlu INSERT.
+      // Kita asumsikan Trigger SUDAH membuat user.
       final response = await supabase
           .from('users')
           .select('role')
           .eq('id', uid)
           .maybeSingle();
 
-      /// Jika user BELUM ADA → otomatis buat
-      if (response == null) {
-        // NOTE: Operasi INSERT ini akan gagal jika RLS INSERT belum diatur
-        final insertRes = await supabase
-            .from('users')
-            .insert({
-              'id': uid,
-              'role': 'user', // default role untuk users baru
-            })
-            .select()
-            .single();
-
+      if (response != null) {
         setState(() {
-          _role = insertRes['role'];
+          _role = response['role'];
           _loading = false;
         });
-        return;
+      } else {
+        // Jika null, berarti Trigger GAGAL atau delay.
+        // Opsional: Tampilkan error atau retry
+        print("User belum terbuat di public.users (Cek Trigger)");
+        setState(() => _loading = false);
       }
-
-      /// Jika user ada → ambil role
-      setState(() {
-        _role = response['role'];
-        _loading = false;
-      });
     } catch (e) {
-      // Jika error RLS atau lainnya
       print("ERROR load role: $e");
-
-      // PERBAIKAN: pastikan _loading diatur ke false setelah error
       setState(() => _loading = false);
     }
   }
