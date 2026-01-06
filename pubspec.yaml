@@ -32,6 +32,7 @@ dependencies:
     sdk: flutter
   google_fonts: ^6.1.0
   intl: ^0.20.2
+  encrypt: ^5.0.3
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -51,6 +52,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+
+  flutter_launcher_icons: ^0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -92,3 +95,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon.png"
+  min_sdk_android: 21 # Mendukung android lama
+  # Opsi tambahan agar icon tidak terlihat kecil di tengah lingkaran putih (Android 8+)
+  adaptive_icon_background: "#FFFFFF" # Ganti kode warna hex sesuai background logo Anda
+  adaptive_icon_foreground: "assets/icon.png"

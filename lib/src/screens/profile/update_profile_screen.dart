@@ -73,27 +73,27 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    // 1. Validasi Form
     if (!_formKey.currentState!.validate() || _user == null) return;
 
-    // if (_user!.ktmPath.isEmpty && _newKtmFile == null) {
-    //   ScaffoldMessenger.of(
-    //     context,
-    //   ).showSnackBar(const SnackBar(content: Text('Silakan upload Foto KTM')));
-    //   return;
-    // }
-
     setState(() => _isSaving = true);
+
+    // Default path adalah path lama
     String finalKtmPath = _user!.ktmPath;
     final uid = Supabase.instance.client.auth.currentUser!.id;
 
     try {
+      // 2. Cek apakah ada file baru yang dipilih
       if (_newKtmFile != null) {
-        finalKtmPath = await _storageService.uploadKtm(
+        // PERBAIKAN DI SINI:
+        // Gunakan 'uploadEncryptedKtm' (sesuai nama di StorageService Anda)
+        finalKtmPath = await _storageService.uploadEncryptedKtm(
           uid: uid,
           file: _newKtmFile!,
         );
       }
 
+      // 3. Update data profil di database
       await _userService.updateProfile(
         uid: uid,
         phone: _phoneCtrl.text.trim(),
@@ -101,6 +101,8 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
       );
 
       if (!mounted) return;
+
+      // 4. Tampilkan sukses
       showCustomSnackBar(
         context,
         message: 'Profil berhasil diperbarui!',
@@ -397,23 +399,61 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
                 style: GoogleFonts.inter(fontSize: 10, color: Colors.grey),
               ),
             ] else if (ktmExist) ...[
-              FutureBuilder<String>(
-                future: _storageService.getSignedUrl(_user!.ktmPath),
+              // ✅ PERBAIKAN TOTAL BAGIAN INI
+              FutureBuilder<List<int>>(
+                // Ubah jadi List<int>
+                future: _storageService.downloadAndDecryptKtm(_user!.ktmPath),
                 builder: (context, snapshot) {
-                  if (snapshot.hasData) {
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        snapshot.data!,
-                        height: 150,
-                        width: double.infinity,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) =>
-                            const Text("Gagal memuat gambar"),
+                  // 1. Loading State
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Container(
+                      height: 150,
+                      width: double.infinity,
+                      color: Colors.grey.shade100,
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  // 2. Error State (Penting biar ketahuan kalau gagal)
+                  if (snapshot.hasError) {
+                    return Container(
+                      height: 150,
+                      width: double.infinity,
+                      color: Colors.red.shade50,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.broken_image, color: Colors.red),
+                          const SizedBox(height: 8),
+                          Text(
+                            "Gagal Dekripsi.\nFile mungkin format lama/rusak.",
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }
-                  return const LinearProgressIndicator();
+
+                  // 3. Success State (Tampilkan Gambar dari Memory)
+                  if (snapshot.hasData) {
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(
+                        Uint8List.fromList(
+                          snapshot.data!,
+                        ), // Konversi ke Uint8List
+                        height: 150,
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                      ),
+                    );
+                  }
+
+                  return const SizedBox();
                 },
               ),
             ] else ...[

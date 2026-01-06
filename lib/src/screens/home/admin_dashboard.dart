@@ -5,6 +5,7 @@ import '../../services/booking_service.dart';
 import '../../services/storage_service.dart';
 import '../../models/booking_model.dart';
 import 'package:rumipa3/src/widgets/custom_snackbar.dart';
+import 'dart:typed_data';
 
 // =========================================================
 // ADMIN DASHBOARD UTAMA (3 TAB)
@@ -155,8 +156,8 @@ class _BookingListWidgetState extends State<BookingListWidget> {
     }
   }
 
-  /// Fungsi baru untuk menampilkan popup gambar Full Screen + Zoom
-  void _showImagePreview(BuildContext context, String imageUrl) {
+  /// Fungsi Popup Gambar Full Screen (Versi Enkripsi)
+  void _showImagePreview(BuildContext context, Uint8List imageBytes) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -165,17 +166,16 @@ class _BookingListWidgetState extends State<BookingListWidget> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Fitur Zoom / Pan
             InteractiveViewer(
               panEnabled: true,
               minScale: 0.5,
               maxScale: 4.0,
+              // GANTI Image.network JADI Image.memory
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(imageUrl),
+                child: Image.memory(imageBytes),
               ),
             ),
-            // Tombol Close kecil di pojok
             Positioned(
               top: 0,
               right: 0,
@@ -318,10 +318,12 @@ class _BookingListWidgetState extends State<BookingListWidget> {
             const SizedBox(height: 16),
 
             // --- BAGIAN FOTO KTM (UPDATED) ---
-            FutureBuilder<String>(
-              future: _storageService.getSignedUrl(booking.ktmPath),
+            FutureBuilder<List<int>>(
+              // Gunakan downloadAndDecryptKtm, BUKAN getSignedUrl
+              future: _storageService.downloadAndDecryptKtm(booking.ktmPath),
               builder: (context, snapshot) {
-                if (!snapshot.hasData) {
+                // 1. Loading State
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return Container(
                     height: 150,
                     width: double.infinity,
@@ -334,15 +336,52 @@ class _BookingListWidgetState extends State<BookingListWidget> {
                   );
                 }
 
-                final imageUrl = snapshot.data!;
+                // 2. Error State (Penting untuk Debugging)
+                if (snapshot.hasError) {
+                  return Container(
+                    height: 150,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.broken_image_rounded,
+                          color: Colors.red,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Gagal memuat gambar",
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.red,
+                          ),
+                        ),
+                        // Text(snapshot.error.toString(), style: TextStyle(fontSize: 10)), // Uncomment untuk liat detail error
+                      ],
+                    ),
+                  );
+                }
+
+                // 3. Success State
+                if (!snapshot.hasData) {
+                  return const Text("Gambar tidak ditemukan");
+                }
+
+                // Konversi List<int> ke Uint8List
+                final imageBytes = Uint8List.fromList(snapshot.data!);
 
                 return GestureDetector(
-                  onTap: () => _showImagePreview(context, imageUrl),
+                  onTap: () => _showImagePreview(context, imageBytes),
                   child: Container(
                     width: double.infinity,
-                    height: 200, // Tinggi area tampilan
+                    height: 200,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100, // Background area kosong
+                      color: Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey.shade300),
                     ),
@@ -351,16 +390,15 @@ class _BookingListWidgetState extends State<BookingListWidget> {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          // Gambar Utama (Contain agar tidak terpotong)
-                          Image.network(
-                            imageUrl,
+                          // GANTI Image.network JADI Image.memory
+                          Image.memory(
+                            imageBytes,
                             width: double.infinity,
                             height: double.infinity,
-                            fit: BoxFit.contain, // Agar pas dalam box
+                            fit: BoxFit.contain,
                             errorBuilder: (_, __, ___) =>
-                                const Center(child: Text("Gagal muat gambar")),
+                                const Center(child: Text("Format Salah")),
                           ),
-                          // Overlay hint (opsional)
                           Positioned(
                             bottom: 8,
                             right: 8,
